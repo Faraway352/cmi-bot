@@ -1,4 +1,5 @@
 import asyncio
+from aiohttp import web
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, StateFilter
 from aiogram.types import BotCommand
@@ -17,11 +18,25 @@ from handlers import (
     echo,
 )
 
+# Health check endpoint для Render и UptimeRobot
+async def healthcheck(request):
+    return web.Response(text="OK")
+
+async def run_web_server():
+    app = web.Application()
+    app.router.add_get("/", healthcheck)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    # Render передаёт порт в переменной окружения PORT, иначе используем 8080
+    port = int(os.getenv("PORT", 8080))
+    site = web.TCPSite(runner, host="0.0.0.0", port=port)
+    await site.start()
+    print(f"Health check server started on port {port}")
+
 async def on_startup():
-    # Создаём таблицы в БД, если их нет
+    # Создаём таблицы в БД
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    # Устанавливаем команды бота в меню
     bot = Bot.get_current()
     await bot.set_my_commands([
         BotCommand(command="start", description="Начать/перезапустить")
@@ -32,7 +47,7 @@ async def main():
     dp = Dispatcher()
     dp["bot"] = bot
 
-    # Регистрация обработчиков
+    # Регистрируем хендлеры
     dp.message.register(cmd_start, CommandStart())
     dp.message.register(process_phone_contact, Registration.waiting_for_phone, F.contact)
     dp.message.register(process_phone_manually, Registration.waiting_for_phone)
@@ -44,10 +59,12 @@ async def main():
 
     await on_startup()
 
-    try:
-        await dp.start_polling(bot)
-    finally:
-        await bot.session.close()
+    # Запускаем веб-сервер и поллинг параллельно
+    await asyncio.gather(
+        run_web_server(),
+        dp.start_polling(bot)
+    )
 
 if __name__ == '__main__':
+    import os
     asyncio.run(main())
