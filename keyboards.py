@@ -95,3 +95,16 @@ def registration_card_keyboard(reg_id: int, event_id: int, can_cancel: bool):
         buttons.append([InlineKeyboardButton(text="❌ Отменить запись", callback_data=f"cancel_reg_{event_id}")])
     buttons.append([InlineKeyboardButton(text="🔙 К моим записям", callback_data="my_registrations")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+# ---------- Отзывы ----------
+def feedback_event_keyboard(events: list):
+    buttons = []
+    for ev in events:
+        short = (ev.title[:30] + "…") if len(ev.title) > 30 else ev.title
+        buttons.append([InlineKeyboardButton(
+            text=f"📝 {short} ({ev.date_time.strftime('%d.%m.%Y')})",
+            callback_data=f"feedback_event_{ev.id}"
+        )])
+    buttons.append([InlineKeyboardButton(text="🏢 О центре в целом", callback_data="feedback_center")])
+    buttons.append([InlineKeyboardButton(text="🔙 В главное меню", callback_data="main_menu")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
