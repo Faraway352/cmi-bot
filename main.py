@@ -49,11 +49,13 @@ async def main():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    # Устанавливаем аватарку бота (прямой запрос к API)
+    # Устанавливаем аватар (используем прямой вызов API)
     try:
         with open("ava.png", "rb") as photo:
             await bot.request("setMyPhoto", {"photo": photo})
         print("Аватарка обновлена")
+    except FileNotFoundError:
+        print("Файл ava.png не найден – аватарка не изменена")
     except Exception as e:
         print(f"Не удалось установить аватарку: {e}")
 
