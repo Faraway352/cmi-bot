@@ -12,14 +12,12 @@ from handlers import (
     cmd_start,
     process_phone_contact,
     process_phone_manually,
-    process_first_name,
-    process_last_name,
+    process_full_name,
     process_gender,
-    process_birth_date,
+    process_birthday,
     echo,
 )
 
-# Health check endpoint для Render и UptimeRobot
 async def healthcheck(request):
     return web.Response(text="OK")
 
@@ -41,22 +39,19 @@ async def main():
     dp.message.register(cmd_start, CommandStart())
     dp.message.register(process_phone_contact, Registration.waiting_for_phone, F.contact)
     dp.message.register(process_phone_manually, Registration.waiting_for_phone)
-    dp.message.register(process_first_name, Registration.waiting_for_first_name)
-    dp.message.register(process_last_name, Registration.waiting_for_last_name)
+    dp.message.register(process_full_name, Registration.waiting_for_full_name)
     dp.callback_query.register(process_gender, Registration.waiting_for_gender, F.data.startswith('gender_'))
-    dp.message.register(process_birth_date, Registration.waiting_for_birth_date)
+    dp.message.register(process_birthday, Registration.waiting_for_birthday)
     dp.message.register(echo, StateFilter(None))
 
-    # Создаём таблицы в БД
+    # Создаём таблицы
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    # Устанавливаем команды бота
     await bot.set_my_commands([
         BotCommand(command="start", description="Начать/перезапустить")
     ])
 
-    # Запускаем веб-сервер и поллинг параллельно
     await asyncio.gather(
         run_web_server(),
         dp.start_polling(bot)
