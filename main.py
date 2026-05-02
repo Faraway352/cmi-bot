@@ -1,14 +1,59 @@
+import asyncio
+import os
+from aiohttp import web
+from aiogram import Bot, Dispatcher, F
+from aiogram.filters import CommandStart, StateFilter
+from aiogram.types import BotCommand
+from sqlalchemy import text          # <-- добавлен для временного запроса
+
+from config import BOT_TOKEN, engine
+from models import Base
+from states import Registration
+from handlers import (
+    cmd_start,
+    process_phone_contact,
+    process_phone_manually,
+    process_first_name,
+    process_last_name,
+    process_gender,
+    process_birth_date,
+    echo,
+)
+
+# Health check endpoint для Render и UptimeRobot
+async def healthcheck(request):
+    return web.Response(text="OK")
+
+async def run_web_server():
+    app = web.Application()
+    app.router.add_get("/", healthcheck)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.environ.get("PORT", 8080))
+    site = web.TCPSite(runner, host="0.0.0.0", port=port)
+    await site.start()
+    print(f"Health check server started on port {port}")
+
 async def main():
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher()
 
-    # ... регистрация обработчиков (без изменений)
+    # Регистрация обработчиков
+    dp.message.register(cmd_start, CommandStart())
+    dp.message.register(process_phone_contact, Registration.waiting_for_phone, F.contact)
+    dp.message.register(process_phone_manually, Registration.waiting_for_phone)
+    dp.message.register(process_first_name, Registration.waiting_for_first_name)
+    dp.message.register(process_last_name, Registration.waiting_for_last_name)
+    dp.callback_query.register(process_gender, Registration.waiting_for_gender, F.data.startswith('gender_'))
+    dp.message.register(process_birth_date, Registration.waiting_for_birth_date)
+    dp.message.register(echo, StateFilter(None))
 
     # Создаём таблицы в БД
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    # ВРЕМЕННО: вывести всех пользователей в лог
+    # ===== ВРЕМЕННЫЙ БЛОК ДЛЯ ПРОСМОТРА ПОЛЬЗОВАТЕЛЕЙ =====
+    # После просмотра логов удали этот блок и закоммить чистую версию
     async with engine.connect() as conn:
         result = await conn.execute(text("SELECT * FROM users"))
         rows = result.fetchall()
@@ -16,8 +61,9 @@ async def main():
         for row in rows:
             print(dict(row._mapping))
         print("=== КОНЕЦ ===")
+    # ===== КОНЕЦ ВРЕМЕННОГО БЛОКА =====
 
-    # Устанавливаем команды бота (оставь как было)
+    # Устанавливаем команды бота в интерфейсе Telegram
     await bot.set_my_commands([
         BotCommand(command="start", description="Начать/перезапустить")
     ])
@@ -27,3 +73,6 @@ async def main():
         run_web_server(),
         dp.start_polling(bot)
     )
+
+if __name__ == '__main__':
+    asyncio.run(main())
