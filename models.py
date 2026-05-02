@@ -18,7 +18,9 @@ class User(Base):
     gender = Column(String(3))
     birthday = Column(Date)
     role = Column(String(20), default='user')
-    vk_url = Column(String(255))                     # <- новое поле
+    vk_url = Column(String(255))
+    tg_username = Column(String(100))          # <-- новое поле
+    email = Column(String(150))                # <-- новое поле
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     is_archived = Column(Boolean, default=False)
 
