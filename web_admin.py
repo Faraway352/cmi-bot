@@ -254,7 +254,10 @@ async def event_create_form(request):
         <label class="block mb-2">Дата и время (ГГГГ-ММ-ДД ЧЧ:ММ):</label><input type="text" name="datetime" placeholder="2026-07-01 15:00" class="w-full border p-2 rounded mb-2" required>
         <label class="block mb-2">Место:</label><input type="text" name="location" class="w-full border p-2 rounded mb-2">
         <label class="block mb-2">Лимит участников (0 - без ограничений):</label><input type="number" name="limit" value="0" class="w-full border p-2 rounded mb-2">
-        <label class="block mb-2">Платное?</label><input type="checkbox" name="is_paid" value="1" class="mb-4">
+        <div class="flex items-center gap-2 mb-4">
+            <label class="text-sm">Платное?</label>
+            <input type="checkbox" name="is_paid" value="1">
+        </div>
         <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Создать</button>
     </form>"""
     return web.Response(text=base_html("Новое мероприятие", content), content_type='text/html')
@@ -297,7 +300,10 @@ async def event_edit_form(request):
             <option value="cancelled" {'selected' if event.status == 'cancelled' else ''}>Отменено</option>
             <option value="finished" {'selected' if event.status == 'finished' else ''}>Завершено</option>
         </select>
-        <label class="block mb-2">Платное?</label><input type="checkbox" name="is_paid" value="1" {'checked' if event.is_paid else ''} class="mb-4">
+        <div class="flex items-center gap-2 mb-4">
+            <label class="text-sm">Платное?</label>
+            <input type="checkbox" name="is_paid" value="1" {'checked' if event.is_paid else ''}>
+        </div>
         <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Сохранить</button>
     </form>"""
     return web.Response(text=base_html("Редактирование", content), content_type='text/html')
