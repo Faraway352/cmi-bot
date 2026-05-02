@@ -49,15 +49,24 @@ async def main():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    # Устанавливаем аватар (используем прямой вызов API)
+    # Устанавливаем аватарку бота (прямой HTTP-запрос к Telegram API)
     try:
-        with open("ava.png", "rb") as photo:
-            await bot.request("setMyPhoto", {"photo": photo})
-        print("Аватарка обновлена")
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            with open("ava.png", "rb") as photo_file:
+                form = aiohttp.FormData()
+                form.add_field("photo", photo_file, filename="ava.png")
+                url = f"https://api.telegram.org/bot{BOT_TOKEN}/setMyPhoto"
+                async with session.post(url, data=form) as resp:
+                    if resp.status == 200:
+                        print("Аватарка обновлена")
+                    else:
+                        error_text = await resp.text()
+                        print(f"Не удалось установить аватарку: {resp.status} {error_text}")
     except FileNotFoundError:
         print("Файл ava.png не найден – аватарка не изменена")
     except Exception as e:
-        print(f"Не удалось установить аватарку: {e}")
+        print(f"Ошибка при установке аватарки: {e}")
 
     # Команды бота
     await bot.set_my_commands([
