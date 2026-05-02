@@ -14,21 +14,33 @@ from keyboards import (
 )
 from validators import is_valid_full_name, contains_emoji, is_valid_birthday
 
-# ---------- Валидация VK ссылки ----------
+# ---------- Вспомогательные валидаторы ----------
 def is_valid_vk_url(url: str) -> bool:
-    """Простая проверка: строка содержит vk.com/ или https://vk.com/..."""
     if not url:
         return False
     return bool(re.match(r"^(https?://)?vk\.com/[\w.]+$", url.strip()))
 
-# ---------- Вспомогательная функция ----------
+def is_valid_tg_username(username: str) -> bool:
+    """Telegram username: @ или без, только буквы, цифры, подчёркивание, 5-32 символа"""
+    if not username:
+        return False
+    # Удаляем @ если есть
+    if username.startswith('@'):
+        username = username[1:]
+    return bool(re.match(r"^[a-zA-Z0-9_]{5,32}$", username))
+
+def is_valid_email(email: str) -> bool:
+    """Простейшая проверка email"""
+    return bool(re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email.strip()))
+
+# ---------- Получение пользователя ----------
 async def get_user(telegram_id: int):
     async with async_session() as session:
         stmt = select(User).where(User.telegram_id == telegram_id)
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
-# ---------- /start ----------
+# ---------- Команда /start ----------
 async def cmd_start(message: types.Message, state: FSMContext):
     await state.clear()
     user = await get_user(message.from_user.id)
@@ -48,7 +60,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
         await message.answer("📱 Пожалуйста, предоставьте ваш номер телефона.", reply_markup=phone_keyboard())
         await state.set_state(Registration.waiting_for_phone)
 
-# ---------- Регистрация ----------
+# ---------- Регистрация (шаги) ----------
 async def process_phone_contact(message: types.Message, state: FSMContext):
     phone = message.contact.phone_number
     await state.update_data(phone=phone)
@@ -116,7 +128,7 @@ async def process_birthday(message: types.Message, state: FSMContext):
     )
     await state.clear()
 
-# ---------- Главное меню ----------
+# ---------- Главное меню (кнопки) ----------
 async def main_menu_handler(message: types.Message, state: FSMContext):
     user = await get_user(message.from_user.id)
     if not user:
@@ -134,9 +146,11 @@ async def main_menu_handler(message: types.Message, state: FSMContext):
     else:
         await message.answer("Используйте кнопки меню.")
 
-# ---------- Просмотр профиля ----------
+# ---------- Отображение профиля ----------
 async def show_profile(message_or_callback, user):
     vk = user.vk_url if user.vk_url else "не указана"
+    tg_username = f"@{user.tg_username}" if user.tg_username else "не указан"
+    email = user.email if user.email else "не указана"
     text = (
         f"👤 **Личный кабинет**\n\n"
         f"📛 Имя: {user.full_name}\n"
@@ -144,13 +158,15 @@ async def show_profile(message_or_callback, user):
         f"⚤ Пол: {user.gender}\n"
         f"🎂 Дата рождения: {user.birthday.strftime('%d.%m.%Y') if user.birthday else 'не указана'}\n"
         f"🔗 VK: {vk}\n"
+        f"💬 Telegram: {tg_username}\n"
+        f"✉️ Email: {email}\n"
     )
     if isinstance(message_or_callback, types.Message):
         await message_or_callback.answer(text, reply_markup=profile_menu_keyboard(), parse_mode="Markdown")
     else:
         await message_or_callback.message.edit_text(text, reply_markup=profile_menu_keyboard(), parse_mode="Markdown")
 
-# ---------- Возврат в главное меню ----------
+# ---------- Возврат в главное меню (callback) ----------
 async def process_callback_main_menu(callback: types.CallbackQuery, state: FSMContext):
     await state.clear()
     user = await get_user(callback.from_user.id)
@@ -160,7 +176,7 @@ async def process_callback_main_menu(callback: types.CallbackQuery, state: FSMCo
         await callback.message.answer("Сначала /start")
     await callback.answer()
 
-# ---------- Обработка inline-кнопок профиля ----------
+# ---------- Обработчик inline-кнопок профиля ----------
 async def profile_menu_handler(callback: types.CallbackQuery, state: FSMContext):
     action = callback.data
     user = await get_user(callback.from_user.id)
@@ -186,9 +202,17 @@ async def profile_menu_handler(callback: types.CallbackQuery, state: FSMContext)
         await callback.message.answer("Введите новую дату рождения в формате ДД.ММ.ГГГГ:")
         await state.set_state(ProfileEdit.waiting_for_birthday)
         await callback.answer()
-    elif action == "edit_vk":                                           # <- новый обработчик
+    elif action == "edit_vk":
         await callback.message.answer("Введите ссылку на ваш профиль VK (например, https://vk.com/id123456789):")
         await state.set_state(ProfileEdit.waiting_for_vk)
+        await callback.answer()
+    elif action == "edit_tg_username":                                          # <-- новый обработчик
+        await callback.message.answer("Введите ваш Telegram username (с @ или без):")
+        await state.set_state(ProfileEdit.waiting_for_tg_username)
+        await callback.answer()
+    elif action == "edit_email":                                                # <-- новый обработчик
+        await callback.message.answer("Введите ваш email:")
+        await state.set_state(ProfileEdit.waiting_for_email)
         await callback.answer()
     elif action == "notify_settings":
         await callback.message.edit_text(
@@ -204,7 +228,7 @@ async def profile_menu_handler(callback: types.CallbackQuery, state: FSMContext)
     else:
         await callback.answer("Неизвестное действие")
 
-# ---------- Редактирование отдельных полей ----------
+# ---------- Редактирование полей ----------
 async def edit_full_name(message: types.Message, state: FSMContext):
     full_name = message.text.strip()
     if not is_valid_full_name(full_name):
@@ -262,7 +286,6 @@ async def edit_birthday(message: types.Message, state: FSMContext):
     await show_profile(message, user)
     await state.clear()
 
-# ---------- Редактирование VK ----------
 async def edit_vk(message: types.Message, state: FSMContext):
     vk_url = message.text.strip()
     if not is_valid_vk_url(vk_url):
@@ -277,7 +300,39 @@ async def edit_vk(message: types.Message, state: FSMContext):
     await show_profile(message, user)
     await state.clear()
 
-# ---------- /menu ----------
+# ---------- Новые обработчики редактирования ----------
+async def edit_tg_username(message: types.Message, state: FSMContext):
+    username = message.text.strip()
+    if not is_valid_tg_username(username):
+        await message.answer("❌ Некорректный username. Используйте формат @example или example (5-32 символов, буквы, цифры, _).")
+        return
+    # Сохраняем без @
+    if username.startswith('@'):
+        username = username[1:]
+    user = await get_user(message.from_user.id)
+    async with async_session() as session:
+        user = await session.merge(user)
+        user.tg_username = username
+        await session.commit()
+    await message.answer("✅ Telegram username обновлён.")
+    await show_profile(message, user)
+    await state.clear()
+
+async def edit_email(message: types.Message, state: FSMContext):
+    email = message.text.strip()
+    if not is_valid_email(email):
+        await message.answer("❌ Некорректный email. Попробуйте ещё раз.")
+        return
+    user = await get_user(message.from_user.id)
+    async with async_session() as session:
+        user = await session.merge(user)
+        user.email = email
+        await session.commit()
+    await message.answer("✅ Email обновлён.")
+    await show_profile(message, user)
+    await state.clear()
+
+# ---------- Команда /menu ----------
 async def cmd_menu(message: types.Message):
     user = await get_user(message.from_user.id)
     if user:
@@ -285,6 +340,6 @@ async def cmd_menu(message: types.Message):
     else:
         await message.answer("Сначала /start")
 
-# ---------- echo ----------
+# ---------- Эхо ----------
 async def echo(message: types.Message):
     await message.answer("Используйте /start или кнопки меню.")
