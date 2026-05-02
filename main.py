@@ -18,7 +18,6 @@ from handlers import (
     echo,
 )
 
-# Health check endpoint для Render и UptimeRobot
 async def healthcheck(request):
     return web.Response(text="OK")
 
@@ -36,7 +35,6 @@ async def main():
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher()
 
-    # Регистрация обработчиков
     dp.message.register(cmd_start, CommandStart())
     dp.message.register(process_phone_contact, Registration.waiting_for_phone, F.contact)
     dp.message.register(process_phone_manually, Registration.waiting_for_phone)
@@ -45,35 +43,13 @@ async def main():
     dp.message.register(process_birthday, Registration.waiting_for_birthday)
     dp.message.register(echo, StateFilter(None))
 
-    # Создаём таблицы в БД
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    # Устанавливаем аватарку бота (прямой HTTP-запрос к Telegram API)
-    try:
-        import aiohttp
-        async with aiohttp.ClientSession() as session:
-            with open("ava.png", "rb") as photo_file:
-                form = aiohttp.FormData()
-                form.add_field("photo", photo_file, filename="ava.png")
-                url = f"https://api.telegram.org/bot{BOT_TOKEN}/setMyPhoto"
-                async with session.post(url, data=form) as resp:
-                    if resp.status == 200:
-                        print("Аватарка обновлена")
-                    else:
-                        error_text = await resp.text()
-                        print(f"Не удалось установить аватарку: {resp.status} {error_text}")
-    except FileNotFoundError:
-        print("Файл ava.png не найден – аватарка не изменена")
-    except Exception as e:
-        print(f"Ошибка при установке аватарки: {e}")
-
-    # Команды бота
     await bot.set_my_commands([
         BotCommand(command="start", description="Начать/перезапустить")
     ])
 
-    # Запуск веб-сервера и поллинга
     await asyncio.gather(
         run_web_server(),
         dp.start_polling(bot)
