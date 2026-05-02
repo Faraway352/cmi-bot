@@ -3,8 +3,7 @@ import os
 from aiohttp import web
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, StateFilter
-from aiogram.types import BotCommand, FSInputFile
-from aiogram.methods import SetMyPhoto       # <-- добавлен импорт
+from aiogram.types import BotCommand
 
 from config import BOT_TOKEN, engine
 from models import Base
@@ -50,10 +49,10 @@ async def main():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    # Устанавливаем аватарку бота (через прямой вызов метода)
+    # Устанавливаем аватарку бота (прямой запрос к API)
     try:
-        photo = FSInputFile("ava.png")
-        await bot(SetMyPhoto(photo=photo))
+        with open("ava.png", "rb") as photo:
+            await bot.request("setMyPhoto", {"photo": photo})
         print("Аватарка обновлена")
     except Exception as e:
         print(f"Не удалось установить аватарку: {e}")
