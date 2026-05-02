@@ -23,6 +23,8 @@ from handlers import (
     edit_gender_callback,
     edit_birthday,
     edit_vk,
+    edit_tg_username,       # <-- новый импорт
+    edit_email,             # <-- новый импорт
     cmd_menu,
     echo,
 )
@@ -44,7 +46,7 @@ async def main():
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher()
 
-    # Регистрация обработчиков
+    # Регистрация
     dp.message.register(cmd_start, CommandStart())
     dp.message.register(process_phone_contact, Registration.waiting_for_phone, F.contact)
     dp.message.register(process_phone_manually, Registration.waiting_for_phone)
@@ -52,25 +54,31 @@ async def main():
     dp.callback_query.register(process_gender, Registration.waiting_for_gender, F.data.startswith('gender_'))
     dp.message.register(process_birthday, Registration.waiting_for_birthday)
 
+    # Главное меню
     dp.message.register(main_menu_handler, F.text.in_([
         "👤 Личный кабинет", "📋 Мои записи", "🎉 Афиша", "💬 Оставить отзыв"
     ]))
 
+    # Личный кабинет (inline-кнопки)
     dp.callback_query.register(profile_menu_handler, F.data.in_([
         "edit_full_name", "edit_phone", "edit_gender", "edit_birthday",
-        "edit_vk", "notify_settings", "profile_menu", "main_menu", "toggle_notify"
+        "edit_vk", "edit_tg_username", "edit_email",
+        "notify_settings", "profile_menu", "main_menu", "toggle_notify"
     ]))
 
+    # Редактирование профиля (состояния)
     dp.message.register(edit_full_name, ProfileEdit.waiting_for_full_name)
     dp.message.register(edit_phone, ProfileEdit.waiting_for_phone)
     dp.callback_query.register(edit_gender_callback, ProfileEdit.waiting_for_gender, F.data.startswith('gender_'))
     dp.message.register(edit_birthday, ProfileEdit.waiting_for_birthday)
     dp.message.register(edit_vk, ProfileEdit.waiting_for_vk)
+    dp.message.register(edit_tg_username, ProfileEdit.waiting_for_tg_username)   # <-- новое
+    dp.message.register(edit_email, ProfileEdit.waiting_for_email)               # <-- новое
 
     dp.message.register(cmd_menu, Command("menu"))
     dp.message.register(echo, StateFilter(None))
 
-    # ===== ВРЕМЕННО: сброс всех таблиц перед созданием =====
+    # ===== ВРЕМЕННЫЙ БЛОК ДЛЯ СБРОСА СТАРОЙ БАЗЫ =====
     # УДАЛИТЬ после первого успешного деплоя!
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
