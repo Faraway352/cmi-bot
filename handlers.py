@@ -3,6 +3,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.filters import CommandStart, StateFilter
 from sqlalchemy import select
 from datetime import date
+import re
 
 from config import async_session
 from models import User
@@ -13,14 +14,21 @@ from keyboards import (
 )
 from validators import is_valid_full_name, contains_emoji, is_valid_birthday
 
-# ---------- Вспомогательная функция: получить пользователя ----------
+# ---------- Валидация VK ссылки ----------
+def is_valid_vk_url(url: str) -> bool:
+    """Простая проверка: строка содержит vk.com/ или https://vk.com/..."""
+    if not url:
+        return False
+    return bool(re.match(r"^(https?://)?vk\.com/[\w.]+$", url.strip()))
+
+# ---------- Вспомогательная функция ----------
 async def get_user(telegram_id: int):
     async with async_session() as session:
         stmt = select(User).where(User.telegram_id == telegram_id)
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
-# ---------- Команда /start ----------
+# ---------- /start ----------
 async def cmd_start(message: types.Message, state: FSMContext):
     await state.clear()
     user = await get_user(message.from_user.id)
@@ -40,7 +48,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
         await message.answer("📱 Пожалуйста, предоставьте ваш номер телефона.", reply_markup=phone_keyboard())
         await state.set_state(Registration.waiting_for_phone)
 
-# ---------- Регистрация (все шаги) ----------
+# ---------- Регистрация ----------
 async def process_phone_contact(message: types.Message, state: FSMContext):
     phone = message.contact.phone_number
     await state.update_data(phone=phone)
@@ -108,7 +116,7 @@ async def process_birthday(message: types.Message, state: FSMContext):
     )
     await state.clear()
 
-# ---------- Главное меню (обработка кнопок) ----------
+# ---------- Главное меню ----------
 async def main_menu_handler(message: types.Message, state: FSMContext):
     user = await get_user(message.from_user.id)
     if not user:
@@ -128,20 +136,21 @@ async def main_menu_handler(message: types.Message, state: FSMContext):
 
 # ---------- Просмотр профиля ----------
 async def show_profile(message_or_callback, user):
+    vk = user.vk_url if user.vk_url else "не указана"
     text = (
         f"👤 **Личный кабинет**\n\n"
         f"📛 Имя: {user.full_name}\n"
         f"📞 Телефон: {user.phone}\n"
         f"⚤ Пол: {user.gender}\n"
         f"🎂 Дата рождения: {user.birthday.strftime('%d.%m.%Y') if user.birthday else 'не указана'}\n"
+        f"🔗 VK: {vk}\n"
     )
-    # Если это сообщение (из главного меню), отправляем с клавиатурой
     if isinstance(message_or_callback, types.Message):
         await message_or_callback.answer(text, reply_markup=profile_menu_keyboard(), parse_mode="Markdown")
-    else:  # CallbackQuery
+    else:
         await message_or_callback.message.edit_text(text, reply_markup=profile_menu_keyboard(), parse_mode="Markdown")
 
-# ---------- Возврат в главное меню из профиля (inline-кнопка) ----------
+# ---------- Возврат в главное меню ----------
 async def process_callback_main_menu(callback: types.CallbackQuery, state: FSMContext):
     await state.clear()
     user = await get_user(callback.from_user.id)
@@ -177,6 +186,10 @@ async def profile_menu_handler(callback: types.CallbackQuery, state: FSMContext)
         await callback.message.answer("Введите новую дату рождения в формате ДД.ММ.ГГГГ:")
         await state.set_state(ProfileEdit.waiting_for_birthday)
         await callback.answer()
+    elif action == "edit_vk":                                           # <- новый обработчик
+        await callback.message.answer("Введите ссылку на ваш профиль VK (например, https://vk.com/id123456789):")
+        await state.set_state(ProfileEdit.waiting_for_vk)
+        await callback.answer()
     elif action == "notify_settings":
         await callback.message.edit_text(
             "🔔 Настройки уведомлений (в разработке).",
@@ -184,7 +197,6 @@ async def profile_menu_handler(callback: types.CallbackQuery, state: FSMContext)
         )
         await callback.answer()
     elif action == "toggle_notify":
-        # заглушка
         await callback.answer("Раздел в разработке", show_alert=True)
     elif action == "profile_menu":
         await show_profile(callback, user)
@@ -192,7 +204,7 @@ async def profile_menu_handler(callback: types.CallbackQuery, state: FSMContext)
     else:
         await callback.answer("Неизвестное действие")
 
-# ---------- Обработчики ввода новых данных профиля ----------
+# ---------- Редактирование отдельных полей ----------
 async def edit_full_name(message: types.Message, state: FSMContext):
     full_name = message.text.strip()
     if not is_valid_full_name(full_name):
@@ -250,7 +262,22 @@ async def edit_birthday(message: types.Message, state: FSMContext):
     await show_profile(message, user)
     await state.clear()
 
-# ---------- Команда /menu (на случай, если клавиатура пропала) ----------
+# ---------- Редактирование VK ----------
+async def edit_vk(message: types.Message, state: FSMContext):
+    vk_url = message.text.strip()
+    if not is_valid_vk_url(vk_url):
+        await message.answer("❌ Некорректная ссылка VK. Пожалуйста, укажите ссылку вида https://vk.com/id...")
+        return
+    user = await get_user(message.from_user.id)
+    async with async_session() as session:
+        user = await session.merge(user)
+        user.vk_url = vk_url
+        await session.commit()
+    await message.answer("✅ Ссылка VK обновлена.")
+    await show_profile(message, user)
+    await state.clear()
+
+# ---------- /menu ----------
 async def cmd_menu(message: types.Message):
     user = await get_user(message.from_user.id)
     if user:
@@ -258,6 +285,6 @@ async def cmd_menu(message: types.Message):
     else:
         await message.answer("Сначала /start")
 
-# ---------- Обработчик нераспознанных сообщений ----------
+# ---------- echo ----------
 async def echo(message: types.Message):
     await message.answer("Используйте /start или кнопки меню.")
