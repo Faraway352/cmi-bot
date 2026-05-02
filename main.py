@@ -1,4 +1,5 @@
-import asyncio, os
+import asyncio
+import os
 from aiohttp import web
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, StateFilter, Command
@@ -24,7 +25,9 @@ from web_admin import (
     feedbacks_list, broadcast_form, broadcast_send,
     error_middleware,
 )
-from reminders import reminder_loop          # <-- импорт фоновой задачи
+
+# Позже раскомментируем импорт фоновой задачи
+# from reminders import reminder_loop
 
 async def healthcheck(request):
     return web.Response(text="OK")
@@ -110,8 +113,19 @@ async def main():
     dp.message.register(cmd_menu, Command("menu"))
     dp.message.register(echo, StateFilter(None))
 
+    # Создание таблиц БД
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    # ===== ВРЕМЕННЫЙ БЛОК: добавить колонку reminder_sent =====
+    # Удалить после первого успешного деплоя!
+    from sqlalchemy import text
+    async with engine.begin() as conn:
+        await conn.execute(text(
+            "ALTER TABLE registrations ADD COLUMN IF NOT EXISTS reminder_sent BOOLEAN DEFAULT FALSE"
+        ))
+        print("=== Колонка reminder_sent проверена/добавлена ===")
+    # ===== КОНЕЦ ВРЕМЕННОГО БЛОКА =====
 
     await bot.set_my_commands([
         BotCommand(command="start", description="Начать/перезапустить"),
@@ -119,11 +133,12 @@ async def main():
         BotCommand(command="seed", description="(админ) Тестовые мероприятия"),
     ])
 
-    # Запускаем всё вместе: веб-сервер, поллинг бота и напоминания
+    # Запускаем веб-сервер и поллинг бота
+    # Раскомментируйте reminder_loop(), когда reminders.py будет добавлен
     await asyncio.gather(
         run_web_server(),
         dp.start_polling(bot),
-        reminder_loop(),
+        # reminder_loop(),
     )
 
 if __name__ == '__main__':
