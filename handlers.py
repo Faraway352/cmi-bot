@@ -5,13 +5,14 @@ from sqlalchemy import select, func
 from datetime import datetime, date
 
 from config import async_session
-from models import User, Event, Registration
-from states import Registration as RegState, ProfileEdit
+from models import User, Event, Registration, Feedback
+from states import Registration as RegState, ProfileEdit, FeedbackFlow
 from keyboards import (
     phone_keyboard, gender_keyboard, remove_keyboard,
     main_menu_keyboard, profile_menu_keyboard, notify_settings_keyboard,
     events_list_keyboard, event_card_keyboard,
-    my_registrations_keyboard, registration_card_keyboard
+    my_registrations_keyboard, registration_card_keyboard,
+    feedback_event_keyboard
 )
 from validators import (
     is_valid_full_name, contains_emoji, is_valid_birthday,
@@ -175,7 +176,7 @@ async def main_menu_handler(message: types.Message, state: FSMContext):
     elif text == "🎉 Афиша":
         await show_events(message)
     elif text == "💬 Оставить отзыв":
-        await message.answer("💬 Здесь можно будет оставить отзыв. Раздел в разработке.")
+        await start_feedback(message)
     else:
         await message.answer("Используйте кнопки меню.")
 
@@ -479,6 +480,81 @@ async def my_registration_detail(callback: types.CallbackQuery):
         text += f"Позиция в очереди: {reg.queue_position}\n"
     await callback.message.edit_text(text, reply_markup=registration_card_keyboard(reg.id, event.id, can_cancel), parse_mode="Markdown")
     await callback.answer()
+
+# ================== ОТЗЫВЫ ==================
+async def start_feedback(message_or_callback):
+    user = await get_user(message_or_callback.from_user.id)
+    async with async_session() as session:
+        # прошедшие мероприятия, на которые пользователь был записан
+        regs = await session.execute(
+            select(Registration).join(Event).where(
+                Registration.user_id == user.id,
+                Registration.status == 'registered',
+                Event.date_time < func.now()
+            ).order_by(Event.date_time.desc())
+        )
+        regs = regs.scalars().all()
+        events = []
+        for r in regs:
+            await session.refresh(r, ['event'])
+            if r.event not in events:
+                events.append(r.event)
+
+    if events:
+        text = "Выберите мероприятие, о котором хотите оставить отзыв:"
+        keyboard = feedback_event_keyboard(events)
+    else:
+        text = "У вас нет посещённых мероприятий. Можете оставить отзыв о центре в целом.\nНапишите ваш отзыв сейчас или отправьте /cancel для отмены."
+        keyboard = None
+
+    if isinstance(message_or_callback, types.Message):
+        if keyboard:
+            await message_or_callback.answer(text, reply_markup=keyboard)
+        else:
+            await message_or_callback.answer(text)
+            # сразу ожидаем текст отзыва
+            await message_or_callback.bot.send_message(message_or_callback.from_user.id,
+                                                       text="Введите текст отзыва:")
+    else:
+        if keyboard:
+            await message_or_callback.message.edit_text(text, reply_markup=keyboard)
+        else:
+            await message_or_callback.message.edit_text(text)
+
+async def feedback_chosen(callback: types.CallbackQuery, state: FSMContext):
+    data = callback.data
+    if data == "feedback_center":
+        await state.update_data(feedback_event_id=None)
+        await callback.message.edit_text("Напишите ваш отзыв о Центре молодёжных инициатив:")
+        await state.set_state(FeedbackFlow.waiting_for_text)
+    elif data.startswith("feedback_event_"):
+        event_id = int(data.split("_")[2])
+        await state.update_data(feedback_event_id=event_id)
+        await callback.message.edit_text("Напишите ваш отзыв о мероприятии:")
+        await state.set_state(FeedbackFlow.waiting_for_text)
+    await callback.answer()
+
+async def save_feedback(message: types.Message, state: FSMContext):
+    text = message.text.strip()
+    if not text:
+        await message.answer("Отзыв не может быть пустым. Попробуйте ещё раз.")
+        return
+
+    data = await state.get_data()
+    event_id = data.get('feedback_event_id')
+    user = await get_user(message.from_user.id)
+
+    async with async_session() as session:
+        feedback = Feedback(
+            user_id=user.id,
+            events_id=event_id,
+            content=text
+        )
+        session.add(feedback)
+        await session.commit()
+
+    await message.answer("✅ Спасибо за ваш отзыв!", reply_markup=main_menu_keyboard())
+    await state.clear()
 
 # ================== Команда /seed ==================
 async def cmd_seed(message: types.Message):
