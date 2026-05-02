@@ -4,7 +4,6 @@ from aiohttp import web
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, StateFilter
 from aiogram.types import BotCommand
-from sqlalchemy import text
 
 from config import BOT_TOKEN, engine
 from models import Base
@@ -52,17 +51,7 @@ async def main():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    # ===== ВРЕМЕННЫЙ БЛОК ДЛЯ УДАЛЕНИЯ ТВОЕЙ ЗАПИСИ =====
-    MY_TELEGRAM_ID = 7359934607  # <-- замени на свой Telegram ID
-    async with engine.begin() as conn:
-        result = await conn.execute(
-            text("DELETE FROM users WHERE telegram_id = :tid"),
-            {"tid": MY_TELEGRAM_ID}
-        )
-        print(f"Удалено записей: {result.rowcount}")
-    # ===== КОНЕЦ ВРЕМЕННОГО БЛОКА =====
-
-    # Устанавливаем команды бота в интерфейсе Telegram
+    # Устанавливаем команды бота
     await bot.set_my_commands([
         BotCommand(command="start", description="Начать/перезапустить")
     ])
