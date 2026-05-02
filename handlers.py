@@ -1,7 +1,7 @@
 from aiogram import Bot, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import CommandStart, StateFilter, Command
-from sqlalchemy import select, func, update
+from sqlalchemy import select, func
 from datetime import datetime, date
 import re
 
@@ -637,7 +637,7 @@ async def admin_panel(message_or_callback):
         await message_or_callback.message.edit_text("🔧 Админ-панель", reply_markup=admin_main_keyboard())
 
 async def admin_users_list(callback: types.CallbackQuery):
-    page = int(callback.data.split("_")[2])  # admin_users_<page>
+    page = int(callback.data.split("_")[2])
     per_page = 5
     offset = (page - 1) * per_page
     async with async_session() as session:
@@ -824,7 +824,7 @@ async def admin_event_delete(callback: types.CallbackQuery):
     async with async_session() as session:
         event = await session.get(Event, event_id)
         if event:
-            event.is_archived = True  # мягкое удаление
+            event.is_archived = True
             await session.commit()
     await callback.message.answer("Мероприятие помечено как удалённое.")
     await admin_events_list(callback)
