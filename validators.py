@@ -2,17 +2,12 @@ import re
 from datetime import date
 
 def is_valid_full_name(text: str) -> bool:
-    """ФИО: только буквы, пробелы, дефисы. Минимум 2 слова."""
     if not text:
         return False
-    # Кириллица, латиница, пробелы, дефисы
     if not re.match(r"^[A-Za-zА-Яа-яёЁ\- ]+$", text):
         return False
-    # Минимум 2 слова (можно изменить под реальное число)
     parts = text.strip().split()
-    if len(parts) < 2:
-        return False
-    return True
+    return len(parts) >= 2
 
 def contains_emoji(text: str) -> bool:
     emoji_pattern = re.compile(
@@ -28,7 +23,6 @@ def contains_emoji(text: str) -> bool:
     return bool(emoji_pattern.search(text))
 
 def is_valid_birthday(text: str) -> bool:
-    """Дата рождения в формате ДД.ММ.ГГГГ, не будущее, возраст 14-120"""
     if contains_emoji(text):
         return False
     if not re.match(r"^\d{2}\.\d{2}\.\d{4}$", text):
@@ -43,3 +37,18 @@ def is_valid_birthday(text: str) -> bool:
     today = date.today()
     age = today.year - b_date.year - ((today.month, today.day) < (b_date.month, b_date.day))
     return 14 <= age <= 120
+
+def is_valid_vk_url(url: str) -> bool:
+    if not url:
+        return False
+    return bool(re.match(r"^(https?://)?vk\.com/[\w.]+$", url.strip()))
+
+def is_valid_tg_username(username: str) -> bool:
+    if not username:
+        return False
+    if username.startswith('@'):
+        username = username[1:]
+    return bool(re.match(r"^[a-zA-Z0-9_]{5,32}$", username))
+
+def is_valid_email(email: str) -> bool:
+    return bool(re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email.strip()))
