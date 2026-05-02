@@ -37,7 +37,9 @@ def profile_menu_keyboard():
         [InlineKeyboardButton(text="📞 Изменить телефон", callback_data="edit_phone")],
         [InlineKeyboardButton(text="⚤ Изменить пол", callback_data="edit_gender")],
         [InlineKeyboardButton(text="🎂 Изменить дату рождения", callback_data="edit_birthday")],
-        [InlineKeyboardButton(text="🔗 Изменить VK", callback_data="edit_vk")],   # <- новая кнопка
+        [InlineKeyboardButton(text="🔗 Изменить VK", callback_data="edit_vk")],
+        [InlineKeyboardButton(text="💬 Изменить Telegram", callback_data="edit_tg_username")],   # <-- новое
+        [InlineKeyboardButton(text="✉️ Изменить Email", callback_data="edit_email")],           # <-- новое
         [InlineKeyboardButton(text="🔔 Уведомления", callback_data="notify_settings")],
         [InlineKeyboardButton(text="🔙 Главное меню", callback_data="main_menu")]
     ])
