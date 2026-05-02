@@ -20,7 +20,6 @@ def gender_keyboard():
 def remove_keyboard():
     return ReplyKeyboardRemove()
 
-# ---------- Главное меню (обычные кнопки) ----------
 def main_menu_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
@@ -32,18 +31,17 @@ def main_menu_keyboard():
         resize_keyboard=True
     )
 
-# ---------- Клавиатура личного кабинета (inline) ----------
 def profile_menu_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✏️ Изменить имя", callback_data="edit_full_name")],
         [InlineKeyboardButton(text="📞 Изменить телефон", callback_data="edit_phone")],
         [InlineKeyboardButton(text="⚤ Изменить пол", callback_data="edit_gender")],
         [InlineKeyboardButton(text="🎂 Изменить дату рождения", callback_data="edit_birthday")],
+        [InlineKeyboardButton(text="🔗 Изменить VK", callback_data="edit_vk")],   # <- новая кнопка
         [InlineKeyboardButton(text="🔔 Уведомления", callback_data="notify_settings")],
         [InlineKeyboardButton(text="🔙 Главное меню", callback_data="main_menu")]
     ])
 
-# Для страницы уведомлений (заглушка)
 def notify_settings_keyboard(notifications_enabled: bool = True):
     status = "✅ Включены" if notifications_enabled else "❌ Отключены"
     return InlineKeyboardMarkup(inline_keyboard=[
