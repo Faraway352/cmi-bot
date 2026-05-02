@@ -30,7 +30,7 @@ async def count_registered(event_id: int) -> int:
         return await session.scalar(
             select(func.count(Registration.id)).where(
                 Registration.events_id == event_id,
-                Registration.status == 'registered',
+                Registration.status == 'registered'
             )
         )
 
@@ -68,7 +68,7 @@ async def cancel_registration(event_id: int, user_id: int, bot: Bot):
             select(Registration).where(
                 Registration.user_id == user_id,
                 Registration.events_id == event_id,
-                Registration.status.in_(['registered', 'waiting']),
+                Registration.status.in_(['registered', 'waiting'])
             )
         )
         reg = reg.scalar_one_or_none()
@@ -88,7 +88,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
     if user:
         await message.answer(
             f"С возвращением, {user.full_name}!\nЧто хотите сделать?",
-            reply_markup=main_menu_keyboard(),
+            reply_markup=main_menu_keyboard()
         )
     else:
         await message.answer(
@@ -96,7 +96,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
             "Я бот, который поможет вам с любой информацией о нашем центре.\n"
             "Хотите узнать о мероприятиях или записаться на них?\n\n"
             "Давайте начнем!",
-            reply_markup=remove_keyboard(),
+            reply_markup=remove_keyboard()
         )
         await message.answer("📱 Пожалуйста, предоставьте ваш номер телефона.", reply_markup=phone_keyboard())
         await state.set_state(RegState.waiting_for_phone)
@@ -152,7 +152,7 @@ async def process_birthday(message: types.Message, state: FSMContext):
             full_name=data.get('full_name'),
             gender=data.get('gender'),
             birthday=b_date,
-            role='user',
+            role='user'
         )
         session.add(new_user)
         await session.commit()
@@ -160,7 +160,7 @@ async def process_birthday(message: types.Message, state: FSMContext):
         f"🎉 Регистрация завершена!\n\n"
         f"ФИО: {data['full_name']}\nПол: {data['gender']}\n"
         f"Дата рождения: {b_date.strftime('%d.%m.%Y')}\n\nДобро пожаловать!",
-        reply_markup=main_menu_keyboard(),
+        reply_markup=main_menu_keyboard()
     )
     await state.clear()
 
@@ -178,7 +178,7 @@ async def main_menu_handler(message: types.Message, state: FSMContext):
     elif text == "🎉 Афиша":
         await show_events(message)
     elif text == "💬 Оставить отзыв":
-        await start_feedback(message)
+        await start_feedback(message, state)
     else:
         await message.answer("Используйте кнопки меню.")
 
@@ -385,7 +385,7 @@ async def event_detail(callback: types.CallbackQuery):
             select(Registration).where(
                 Registration.user_id == user.id,
                 Registration.events_id == event_id,
-                Registration.status.in_(['registered', 'waiting']),
+                Registration.status.in_(['registered', 'waiting'])
             )
         )
         reg = reg.scalar_one_or_none()
@@ -414,7 +414,7 @@ async def register_for_event(callback: types.CallbackQuery):
             select(Registration).where(
                 Registration.user_id == user.id,
                 Registration.events_id == event_id,
-                Registration.status.in_(['registered', 'waiting']),
+                Registration.status.in_(['registered', 'waiting'])
             )
         )
         if existing.scalar_one_or_none():
@@ -500,7 +500,7 @@ async def my_registration_detail(callback: types.CallbackQuery):
     await callback.answer()
 
 # ================== ОТЗЫВЫ ==================
-async def start_feedback(message_or_callback):
+async def start_feedback(message_or_callback, state: FSMContext = None):
     user = await get_user(message_or_callback.from_user.id)
     async with async_session() as session:
         regs = await session.execute(
@@ -514,22 +514,27 @@ async def start_feedback(message_or_callback):
             await session.refresh(r, ['event'])
             if r.event not in events:
                 events.append(r.event)
+
     if events:
         text = "Выберите мероприятие, о котором хотите оставить отзыв:"
         keyboard = feedback_event_keyboard(events)
     else:
-        text = "У вас нет посещённых мероприятий. Можете оставить отзыв о центре в целом.\nНапишите ваш отзыв сейчас или отправьте /cancel."
+        text = "У вас нет посещённых мероприятий. Можете оставить отзыв о центре в целом.\nНапишите ваш отзыв сейчас."
         keyboard = None
+
     if isinstance(message_or_callback, types.Message):
         if keyboard:
             await message_or_callback.answer(text, reply_markup=keyboard)
         else:
             await message_or_callback.answer(text)
+            if state:
+                await state.set_state(FeedbackFlow.waiting_for_text)
     else:
         if keyboard:
             await message_or_callback.message.edit_text(text, reply_markup=keyboard)
         else:
             await message_or_callback.message.edit_text(text)
+            # Этот случай не используется, но если понадобится, нужно будет также установить state
 
 async def feedback_chosen(callback: types.CallbackQuery, state: FSMContext):
     data = callback.data
