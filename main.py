@@ -3,7 +3,7 @@ import os
 from aiohttp import web
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, StateFilter
-from aiogram.types import BotCommand
+from aiogram.types import BotCommand, InputFile
 
 from config import BOT_TOKEN, engine
 from models import Base
@@ -18,6 +18,7 @@ from handlers import (
     echo,
 )
 
+# Health check endpoint для Render и UptimeRobot
 async def healthcheck(request):
     return web.Response(text="OK")
 
@@ -44,14 +45,24 @@ async def main():
     dp.message.register(process_birthday, Registration.waiting_for_birthday)
     dp.message.register(echo, StateFilter(None))
 
-    # Создаём таблицы
+    # Создаём таблицы в БД
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+    # Устанавливаем аватарку бота
+    try:
+        photo = InputFile("ava.png")
+        await bot.set_my_photo(photo)
+        print("Аватарка обновлена")
+    except Exception as e:
+        print(f"Не удалось установить аватарку: {e}")
+
+    # Устанавливаем команды бота
     await bot.set_my_commands([
         BotCommand(command="start", description="Начать/перезапустить")
     ])
 
+    # Запускаем веб-сервер и поллинг параллельно
     await asyncio.gather(
         run_web_server(),
         dp.start_polling(bot)
