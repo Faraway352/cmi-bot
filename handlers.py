@@ -14,23 +14,10 @@ from keyboards import (
     events_list_keyboard, event_card_keyboard,
     my_registrations_keyboard, registration_card_keyboard
 )
-from validators import is_valid_full_name, contains_emoji, is_valid_birthday
-
-# ---------- Валидаторы VK, TG, Email ----------
-def is_valid_vk_url(url: str) -> bool:
-    if not url:
-        return False
-    return bool(re.match(r"^(https?://)?vk\.com/[\w.]+$", url.strip()))
-
-def is_valid_tg_username(username: str) -> bool:
-    if not username:
-        return False
-    if username.startswith('@'):
-        username = username[1:]
-    return bool(re.match(r"^[a-zA-Z0-9_]{5,32}$", username))
-
-def is_valid_email(email: str) -> bool:
-    return bool(re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email.strip()))
+from validators import (
+    is_valid_full_name, contains_emoji, is_valid_birthday,
+    is_valid_vk_url, is_valid_tg_username, is_valid_email
+)
 
 # ---------- Вспомогательные функции ----------
 async def get_user(telegram_id: int):
