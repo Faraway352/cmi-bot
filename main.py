@@ -7,7 +7,14 @@ from aiogram.types import BotCommand
 
 from config import BOT_TOKEN, engine
 from models import Base
-from states import Registration as RegState, ProfileEdit, FeedbackFlow
+from states import (
+    Registration as RegState,
+    ProfileEdit,
+    FeedbackFlow,
+    AdminEventCreate,
+    AdminEventEdit,
+    AdminBroadcast,
+)
 from handlers import (
     cmd_start,
     process_phone_contact,
@@ -34,23 +41,83 @@ from handlers import (
     start_feedback,
     feedback_chosen,
     save_feedback,
+    # Админ-панель бота
+    admin_panel,
+    admin_users_list,
+    admin_events_list,
+    admin_feedbacks_list,
+    admin_event_create_start,
+    admin_event_create_title,
+    admin_event_create_description,
+    admin_event_create_date,
+    admin_event_create_time,
+    admin_event_create_location,
+    admin_event_create_limit,
+    admin_event_create_is_paid,
+    admin_event_edit,
+    admin_event_edit_field,
+    admin_event_edit_value,
+    admin_event_delete,
+    admin_feedback_detail,
+    admin_broadcast_start,
+    admin_broadcast_message,
+    admin_broadcast_confirm,
+    admin_broadcast_cancel,
     cmd_seed,
     cmd_menu,
     echo,
 )
+from web_admin import (
+    login_page,
+    login_send_code,
+    verify_code,
+    logout,
+    dashboard,
+    users_list,
+    events_list,
+    event_create_form,
+    event_create,
+    event_edit_form,
+    event_edit_post,
+    event_delete,
+    feedbacks_list,
+    broadcast_form,
+    broadcast_send,
+)
 
+# Health check endpoint для Render и UptimeRobot
 async def healthcheck(request):
     return web.Response(text="OK")
 
 async def run_web_server():
     app = web.Application()
+
+    # Health check
     app.router.add_get("/", healthcheck)
+
+    # Маршруты веб-админки
+    app.router.add_get("/admin", login_page)
+    app.router.add_post("/admin/login", login_send_code)
+    app.router.add_post("/admin/verify", verify_code)
+    app.router.add_get("/admin/logout", logout)
+    app.router.add_get("/admin/dashboard", dashboard)
+    app.router.add_get("/admin/users", users_list)
+    app.router.add_get("/admin/events", events_list)
+    app.router.add_get("/admin/events/create", event_create_form)
+    app.router.add_post("/admin/events/create", event_create)
+    app.router.add_get("/admin/events/edit/{id}", event_edit_form)
+    app.router.add_post("/admin/events/edit/{id}", event_edit_post)
+    app.router.add_get("/admin/events/delete/{id}", event_delete)
+    app.router.add_get("/admin/feedbacks", feedbacks_list)
+    app.router.add_get("/admin/broadcast", broadcast_form)
+    app.router.add_post("/admin/broadcast", broadcast_send)
+
     runner = web.AppRunner(app)
     await runner.setup()
     port = int(os.environ.get("PORT", 8080))
     site = web.TCPSite(runner, host="0.0.0.0", port=port)
     await site.start()
-    print(f"Health check server started on port {port}")
+    print(f"Health check and admin web server started on port {port}")
 
 async def main():
     bot = Bot(token=BOT_TOKEN)
@@ -65,17 +132,21 @@ async def main():
     dp.message.register(process_birthday, RegState.waiting_for_birthday)
 
     # Главное меню
-    dp.message.register(main_menu_handler, F.text.in_([
-        "👤 Личный кабинет", "📋 Мои записи", "🎉 Афиша", "💬 Оставить отзыв"
-    ]))
+    dp.message.register(
+        main_menu_handler,
+        F.text.in_(["👤 Личный кабинет", "📋 Мои записи", "🎉 Афиша", "💬 Оставить отзыв", "🔧 Админ-панель"])
+    )
 
     # Профиль
     dp.callback_query.register(process_callback_main_menu, F.data == "main_menu")
-    dp.callback_query.register(profile_menu_handler, F.data.in_([
-        "edit_full_name", "edit_phone", "edit_gender", "edit_birthday",
-        "edit_vk", "edit_tg_username", "edit_email",
-        "notify_settings", "toggle_notify", "profile_menu"
-    ]))
+    dp.callback_query.register(
+        profile_menu_handler,
+        F.data.in_([
+            "edit_full_name", "edit_phone", "edit_gender", "edit_birthday",
+            "edit_vk", "edit_tg_username", "edit_email",
+            "notify_settings", "toggle_notify", "profile_menu"
+        ])
+    )
     dp.message.register(edit_full_name, ProfileEdit.waiting_for_full_name)
     dp.message.register(edit_phone, ProfileEdit.waiting_for_phone)
     dp.callback_query.register(edit_gender_callback, ProfileEdit.waiting_for_gender, F.data.startswith('gender_'))
@@ -98,23 +169,52 @@ async def main():
     dp.callback_query.register(feedback_chosen, F.data.startswith("feedback_"))
     dp.message.register(save_feedback, FeedbackFlow.waiting_for_text)
 
-    # Команды
+    # Админ-панель бота
+    dp.callback_query.register(admin_panel, F.data == "admin_panel")
+    dp.callback_query.register(admin_users_list, F.data.startswith("admin_users_"))
+    dp.callback_query.register(admin_events_list, F.data.startswith("admin_events_"))
+    dp.callback_query.register(admin_feedbacks_list, F.data.startswith("admin_feedbacks_"))
+    dp.callback_query.register(admin_event_create_start, F.data == "admin_event_create")
+    dp.callback_query.register(admin_event_edit, F.data.startswith("admin_event_edit_"))
+    dp.callback_query.register(admin_event_edit_field, F.data.startswith("editfield_"))
+    dp.callback_query.register(admin_event_delete, F.data.startswith("admin_event_delete_"))
+    dp.callback_query.register(admin_feedback_detail, F.data.startswith("admin_fb_"))
+    dp.callback_query.register(admin_broadcast_start, F.data == "admin_broadcast")
+    dp.callback_query.register(admin_broadcast_confirm, F.data == "broadcast_confirm")
+    dp.callback_query.register(admin_broadcast_cancel, F.data == "broadcast_cancel")
+
+    # Состояния создания мероприятия
+    dp.message.register(admin_event_create_title, AdminEventCreate.waiting_for_title)
+    dp.message.register(admin_event_create_description, AdminEventCreate.waiting_for_description)
+    dp.message.register(admin_event_create_date, AdminEventCreate.waiting_for_date)
+    dp.message.register(admin_event_create_time, AdminEventCreate.waiting_for_time)
+    dp.message.register(admin_event_create_location, AdminEventCreate.waiting_for_location)
+    dp.message.register(admin_event_create_limit, AdminEventCreate.waiting_for_limit)
+    dp.message.register(admin_event_create_is_paid, AdminEventCreate.waiting_for_is_paid)
+
+    dp.message.register(admin_event_edit_value, AdminEventEdit.waiting_for_value)
+    dp.message.register(admin_broadcast_message, AdminBroadcast.waiting_for_message)
+    dp.callback_query.register(admin_broadcast_confirm, AdminBroadcast.confirm, F.data == "broadcast_confirm")
+    dp.callback_query.register(admin_broadcast_cancel, AdminBroadcast.confirm, F.data == "broadcast_cancel")
+
+    # Общие команды
     dp.message.register(cmd_seed, Command("seed"))
     dp.message.register(cmd_menu, Command("menu"))
     dp.message.register(echo, StateFilter(None))
 
+    # Создание таблиц БД
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
     await bot.set_my_commands([
         BotCommand(command="start", description="Начать/перезапустить"),
         BotCommand(command="menu", description="Открыть главное меню"),
-        BotCommand(command="seed", description="(админ) Создать тестовые мероприятия")
+        BotCommand(command="seed", description="(админ) Тестовые мероприятия"),
     ])
 
     await asyncio.gather(
         run_web_server(),
-        dp.start_polling(bot)
+        dp.start_polling(bot),
     )
 
 if __name__ == '__main__':
