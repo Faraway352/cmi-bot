@@ -3,7 +3,7 @@ import os
 from aiohttp import web
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, StateFilter
-from aiogram.types import BotCommand, InputFile
+from aiogram.types import BotCommand, FSInputFile    # ← изменено: FSInputFile вместо InputFile
 
 from config import BOT_TOKEN, engine
 from models import Base
@@ -51,7 +51,7 @@ async def main():
 
     # Устанавливаем аватарку бота
     try:
-        photo = InputFile("ava.png")
+        photo = FSInputFile("ava.png")          # ← исправлено
         await bot.set_my_photo(photo)
         print("Аватарка обновлена")
     except Exception as e:
