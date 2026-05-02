@@ -3,7 +3,6 @@ from aiogram.fsm.context import FSMContext
 from aiogram.filters import CommandStart, StateFilter, Command
 from sqlalchemy import select, func
 from datetime import datetime, date
-import re
 
 from config import async_session
 from models import User, Event, Registration
@@ -35,7 +34,6 @@ async def count_registered(event_id: int) -> int:
         )
 
 async def promote_queue(event_id: int, bot: Bot):
-    """Продвигает первого из очереди в зарегистрированные"""
     async with async_session() as session:
         first = await session.execute(
             select(Registration).where(
@@ -48,14 +46,12 @@ async def promote_queue(event_id: int, bot: Bot):
             return
         first.status = 'registered'
         first.queue_position = 0
-        # Уведомление пользователю
         user = await session.get(User, first.user_id)
         if user:
             try:
                 await bot.send_message(user.telegram_id, "🎉 Освободилось место! Вы автоматически записаны.")
             except Exception:
                 pass
-        # Обновить позиции оставшихся
         remaining = await session.execute(
             select(Registration).where(
                 Registration.events_id == event_id,
@@ -67,7 +63,6 @@ async def promote_queue(event_id: int, bot: Bot):
         await session.commit()
 
 async def cancel_registration(event_id: int, user_id: int, bot: Bot):
-    """Отменяет запись пользователя и продвигает очередь"""
     async with async_session() as session:
         reg = await session.execute(
             select(Registration).where(
@@ -103,7 +98,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
         await message.answer("📱 Пожалуйста, предоставьте ваш номер телефона.", reply_markup=phone_keyboard())
         await state.set_state(RegState.waiting_for_phone)
 
-# ---------- Регистрация (шаги) ----------
+# ---------- Регистрация ----------
 async def process_phone_contact(message: types.Message, state: FSMContext):
     phone = message.contact.phone_number
     await state.update_data(phone=phone)
@@ -184,7 +179,7 @@ async def main_menu_handler(message: types.Message, state: FSMContext):
     else:
         await message.answer("Используйте кнопки меню.")
 
-# ---------- Профиль (полностью) ----------
+# ---------- Профиль ----------
 async def show_profile(message_or_callback, user):
     vk = user.vk_url or "не указана"
     tg = f"@{user.tg_username}" if user.tg_username else "не указан"
@@ -212,7 +207,9 @@ async def process_callback_main_menu(callback: types.CallbackQuery, state: FSMCo
 async def profile_menu_handler(callback: types.CallbackQuery, state: FSMContext):
     action = callback.data
     user = await get_user(callback.from_user.id)
-    if not user: return
+    if not user:
+        await callback.answer("Сначала /start")
+        return
     if action == "main_menu":
         await process_callback_main_menu(callback, state)
     elif action == "edit_full_name":
@@ -244,7 +241,107 @@ async def profile_menu_handler(callback: types.CallbackQuery, state: FSMContext)
         await show_profile(callback, user)
     await callback.answer()
 
-# Редактирование полей (edit_full_name, edit_phone, edit_gender_callback, edit_birthday, edit_vk, edit_tg_username, edit_email) — без изменений, но я их опущу для краткости, в полном файле они есть.
+# ---------- Редактирование полей профиля ----------
+async def edit_full_name(message: types.Message, state: FSMContext):
+    full_name = message.text.strip()
+    if not is_valid_full_name(full_name):
+        await message.answer("❌ Некорректное ФИО. Попробуйте ещё раз.")
+        return
+    user = await get_user(message.from_user.id)
+    async with async_session() as session:
+        user = await session.merge(user)
+        user.full_name = full_name
+        await session.commit()
+    await message.answer("✅ Имя обновлено.")
+    await show_profile(message, user)
+    await state.clear()
+
+async def edit_phone(message: types.Message, state: FSMContext):
+    phone = message.text.strip()
+    if not phone.startswith("+") or not phone[1:].isdigit():
+        await message.answer("❌ Введите номер в формате +7XXXXXXXXXX.")
+        return
+    user = await get_user(message.from_user.id)
+    async with async_session() as session:
+        user = await session.merge(user)
+        user.phone = phone
+        await session.commit()
+    await message.answer("✅ Телефон обновлён.")
+    await show_profile(message, user)
+    await state.clear()
+
+async def edit_gender_callback(callback: types.CallbackQuery, state: FSMContext):
+    gender = 'Муж' if callback.data == 'gender_male' else 'Жен'
+    user = await get_user(callback.from_user.id)
+    async with async_session() as session:
+        user = await session.merge(user)
+        user.gender = gender
+        await session.commit()
+    await callback.message.edit_reply_markup()
+    await callback.message.answer("✅ Пол обновлён.")
+    await show_profile(callback.message, user)
+    await state.clear()
+    await callback.answer()
+
+async def edit_birthday(message: types.Message, state: FSMContext):
+    birth_text = message.text.strip()
+    if not is_valid_birthday(birth_text):
+        await message.answer("❌ Некорректная дата. Попробуйте ещё раз.")
+        return
+    day, month, year = map(int, birth_text.split("."))
+    b_date = date(year, month, day)
+    user = await get_user(message.from_user.id)
+    async with async_session() as session:
+        user = await session.merge(user)
+        user.birthday = b_date
+        await session.commit()
+    await message.answer("✅ Дата рождения обновлена.")
+    await show_profile(message, user)
+    await state.clear()
+
+async def edit_vk(message: types.Message, state: FSMContext):
+    vk_url = message.text.strip()
+    if not is_valid_vk_url(vk_url):
+        await message.answer("❌ Некорректная ссылка VK. Пожалуйста, укажите ссылку вида https://vk.com/id...")
+        return
+    user = await get_user(message.from_user.id)
+    async with async_session() as session:
+        user = await session.merge(user)
+        user.vk_url = vk_url
+        await session.commit()
+    await message.answer("✅ Ссылка VK обновлена.")
+    await show_profile(message, user)
+    await state.clear()
+
+async def edit_tg_username(message: types.Message, state: FSMContext):
+    username = message.text.strip()
+    if not is_valid_tg_username(username):
+        await message.answer("❌ Некорректный username. Используйте формат @example или example (5-32 символов, буквы, цифры, _).")
+        return
+    if username.startswith('@'):
+        username = username[1:]
+    user = await get_user(message.from_user.id)
+    async with async_session() as session:
+        user = await session.merge(user)
+        user.tg_username = username
+        await session.commit()
+    await message.answer("✅ Telegram username обновлён.")
+    await show_profile(message, user)
+    await state.clear()
+
+async def edit_email(message: types.Message, state: FSMContext):
+    email = message.text.strip()
+    if not is_valid_email(email):
+        await message.answer("❌ Некорректный email. Попробуйте ещё раз.")
+        return
+    user = await get_user(message.from_user.id)
+    async with async_session() as session:
+        user = await session.merge(user)
+        user.email = email
+        await session.commit()
+    await message.answer("✅ Email обновлён.")
+    await show_profile(message, user)
+    await state.clear()
 
 # ================== АФИША ==================
 async def show_events(message_or_callback):
@@ -314,7 +411,6 @@ async def register_for_event(callback: types.CallbackQuery):
             return
         regs = await count_registered(event.id)
         if event.participants_limit and regs >= event.participants_limit:
-            # в очередь
             max_q = await session.scalar(select(func.max(Registration.queue_position)).where(
                 Registration.events_id == event_id, Registration.status == 'waiting'
             ))
@@ -334,7 +430,6 @@ async def cancel_reg_handler(callback: types.CallbackQuery, bot: Bot):
     success = await cancel_registration(event_id, user.id, bot)
     if success:
         await callback.answer("Запись отменена.")
-        # возврат к карточке мероприятия
         await event_detail(callback)
     else:
         await callback.answer("Не удалось отменить запись.", show_alert=True)
