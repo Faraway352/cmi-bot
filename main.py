@@ -18,6 +18,7 @@ from handlers import (
     echo,
 )
 
+# Health check endpoint для Render и UptimeRobot
 async def healthcheck(request):
     return web.Response(text="OK")
 
@@ -44,9 +45,18 @@ async def main():
     dp.message.register(process_birthday, Registration.waiting_for_birthday)
     dp.message.register(echo, StateFilter(None))
 
-    # Создаём таблицы
+    # ===== ВРЕМЕННЫЙ БЛОК ДЛЯ СБРОСА СТАРОЙ БАЗЫ =====
+    # Полностью удаляет все таблицы перед созданием новых
+    # УДАЛИТЬ ПОСЛЕ ПЕРВОГО УСПЕШНОГО ДЕПЛОЯ
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        print("=== Old tables dropped ===")
+    # ===== КОНЕЦ ВРЕМЕННОГО БЛОКА =====
+
+    # Создаём таблицы заново (актуальная структура)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        print("=== New tables created ===")
 
     await bot.set_my_commands([
         BotCommand(command="start", description="Начать/перезапустить")
