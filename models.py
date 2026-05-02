@@ -15,9 +15,10 @@ class User(Base):
     telegram_id = Column(BigInteger, unique=True, nullable=False)
     phone = Column(String(12))
     full_name = Column(String(150))
-    gender = Column(String(3))                     # 'Муж' или 'Жен'
+    gender = Column(String(3))
     birthday = Column(Date)
     role = Column(String(20), default='user')
+    vk_url = Column(String(255))                     # <- новое поле
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     is_archived = Column(Boolean, default=False)
 
@@ -44,7 +45,7 @@ class Registration(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     events_id = Column(Integer, ForeignKey('events.id'), nullable=False)
-    status = Column(String(20), nullable=False, default='registered')  # registered/waiting/cancelled
+    status = Column(String(20), nullable=False, default='registered')
     queue_position = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -64,7 +65,7 @@ class NotifySetting(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    notification_type = Column(String(50))         # например 'event_reminder', 'broadcast'
+    notification_type = Column(String(50))
     is_enabled = Column(Boolean, default=True)
 
 
@@ -73,9 +74,9 @@ class AdminAction(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     admin_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    action = Column(String(255), nullable=False)    # описание действия (create_event, ...)
+    action = Column(String(255), nullable=False)
     object_id = Column(Integer)
-    payload = Column(JSONB)                         # детали изменений
+    payload = Column(JSONB)
     ip_address = Column(INET)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
