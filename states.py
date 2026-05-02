@@ -11,4 +11,6 @@ class ProfileEdit(StatesGroup):
     waiting_for_phone = State()
     waiting_for_gender = State()
     waiting_for_birthday = State()
-    waiting_for_vk = State()               # <- новое состояние
+    waiting_for_vk = State()
+    waiting_for_tg_username = State()    # <-- новое
+    waiting_for_email = State()          # <-- новое
