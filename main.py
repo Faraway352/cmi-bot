@@ -83,6 +83,7 @@ from web_admin import (
     feedbacks_list,
     broadcast_form,
     broadcast_send,
+    error_middleware,
 )
 
 # Health check endpoint для Render и UptimeRobot
@@ -91,6 +92,9 @@ async def healthcheck(request):
 
 async def run_web_server():
     app = web.Application()
+
+    # Middleware для логирования ошибок
+    app.middlewares.append(error_middleware)
 
     # Health check
     app.router.add_get("/", healthcheck)
