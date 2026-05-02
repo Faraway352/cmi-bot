@@ -25,9 +25,7 @@ from web_admin import (
     feedbacks_list, broadcast_form, broadcast_send,
     error_middleware,
 )
-
-# Позже раскомментируем импорт фоновой задачи
-# from reminders import reminder_loop
+from reminders import reminder_loop          # <-- фоновая задача напоминаний
 
 async def healthcheck(request):
     return web.Response(text="OK")
@@ -113,7 +111,7 @@ async def main():
     dp.message.register(cmd_menu, Command("menu"))
     dp.message.register(echo, StateFilter(None))
 
-    # Создание таблиц БД
+    # Создание таблиц БД (колонка reminder_sent уже добавлена ранее)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
@@ -123,12 +121,11 @@ async def main():
         BotCommand(command="seed", description="(админ) Тестовые мероприятия"),
     ])
 
-    # Запускаем веб-сервер и поллинг бота
-    # Раскомментируйте reminder_loop(), когда reminders.py будет добавлен
+    # Запускаем всё вместе: веб-сервер, поллинг бота и напоминания
     await asyncio.gather(
         run_web_server(),
         dp.start_polling(bot),
-        # reminder_loop(),
+        reminder_loop(),
     )
 
 if __name__ == '__main__':
