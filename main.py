@@ -24,6 +24,7 @@ from web_admin import (
     feedbacks_list, broadcast_form, broadcast_send,
     error_middleware,
 )
+from reminders import reminder_loop          # <-- импорт фоновой задачи
 
 async def healthcheck(request):
     return web.Response(text="OK")
@@ -118,7 +119,12 @@ async def main():
         BotCommand(command="seed", description="(админ) Тестовые мероприятия"),
     ])
 
-    await asyncio.gather(run_web_server(), dp.start_polling(bot))
+    # Запускаем всё вместе: веб-сервер, поллинг бота и напоминания
+    await asyncio.gather(
+        run_web_server(),
+        dp.start_polling(bot),
+        reminder_loop(),
+    )
 
 if __name__ == '__main__':
     asyncio.run(main())
