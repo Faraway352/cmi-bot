@@ -497,27 +497,6 @@ async def cmd_seed(message: types.Message):
         await session.commit()
     await message.answer("✅ Тестовые мероприятия созданы.")
 
-# ================== Команда /admin ==================
-SECRET_ADMIN_CODE = "make_me_admin_2026"
-
-async def cmd_admin(message: types.Message):
-    parts = message.text.strip().split(maxsplit=1)
-    if len(parts) != 2:
-        await message.answer("Использование: /admin <секретный_код>")
-        return
-    if parts[1] != SECRET_ADMIN_CODE:
-        await message.answer("Неверный код.")
-        return
-    user = await get_user(message.from_user.id)
-    if not user:
-        await message.answer("Сначала зарегистрируйтесь (/start).")
-        return
-    async with async_session() as session:
-        user = await session.merge(user)
-        user.role = 'admin'
-        await session.commit()
-    await message.answer("✅ Вы теперь администратор!")
-
 # ---------- /menu ----------
 async def cmd_menu(message: types.Message):
     user = await get_user(message.from_user.id)
