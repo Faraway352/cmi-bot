@@ -4,12 +4,10 @@ from aiogram.types import (
     ReplyKeyboardRemove
 )
 
-# ---------- Регистрация ----------
 def phone_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text="📱 Предоставить номер", request_contact=True)]],
-        resize_keyboard=True,
-        one_time_keyboard=True
+        resize_keyboard=True, one_time_keyboard=True
     )
 
 def gender_keyboard():
@@ -21,7 +19,7 @@ def gender_keyboard():
 def remove_keyboard():
     return ReplyKeyboardRemove()
 
-# ---------- Главное меню (обычные кнопки) ----------
+# ---------- Главное меню ----------
 def main_menu_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
@@ -47,8 +45,8 @@ def profile_menu_keyboard():
         [InlineKeyboardButton(text="🔙 Главное меню", callback_data="main_menu")]
     ])
 
-def notify_settings_keyboard(notifications_enabled: bool = True):
-    status = "✅ Включены" if notifications_enabled else "❌ Отключены"
+def notify_settings_keyboard(enabled: bool = True):
+    status = "✅ Включены" if enabled else "❌ Отключены"
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=status, callback_data="toggle_notify")],
         [InlineKeyboardButton(text="🔙 Назад в профиль", callback_data="profile_menu")]
@@ -56,49 +54,42 @@ def notify_settings_keyboard(notifications_enabled: bool = True):
 
 # ---------- Афиша ----------
 def events_list_keyboard(events: list):
-    """Создаёт клавиатуру из списка мероприятий (не более 4)"""
     buttons = []
     for ev in events:
-        # Обрезаем название до 30 символов для кнопки
-        short_title = ev.title[:30] + "…" if len(ev.title) > 30 else ev.title
+        short = (ev.title[:30] + "…") if len(ev.title) > 30 else ev.title
         buttons.append([InlineKeyboardButton(
-            text=f"{short_title} ({ev.date_time.strftime('%d.%m %H:%M')})",
+            text=f"{short} ({ev.date_time.strftime('%d.%m %H:%M')})",
             callback_data=f"event_{ev.id}"
         )])
-    # Кнопка "Назад" в главное меню (по callback главного меню)
     buttons.append([InlineKeyboardButton(text="🔙 В главное меню", callback_data="main_menu")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-def event_card_keyboard(event_id: int, is_registered: bool = False, can_register: bool = True):
-    """Клавиатура для карточки мероприятия"""
+def event_card_keyboard(event_id: int, is_registered: bool, can_register: bool):
     buttons = []
     if is_registered:
         buttons.append([InlineKeyboardButton(text="❌ Отменить запись", callback_data=f"cancel_reg_{event_id}")])
     elif can_register:
         buttons.append([InlineKeyboardButton(text="✅ Записаться", callback_data=f"register_{event_id}")])
     else:
-        # Если места кончились – кнопка "В очередь"
         buttons.append([InlineKeyboardButton(text="🕒 Встать в очередь", callback_data=f"enqueue_{event_id}")])
     buttons.append([InlineKeyboardButton(text="🔙 К афише", callback_data="show_events")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 # ---------- Мои записи ----------
 def my_registrations_keyboard(registrations: list):
-    """Кнопки для списка записей пользователя"""
     buttons = []
     for reg in registrations:
-        event = reg.event  # предполагается загрузка связанного объекта
-        short_title = event.title[:30] + "…" if len(event.title) > 30 else event.title
-        status_icon = {"registered": "✅", "waiting": "🕒", "cancelled": "❌"}.get(reg.status, "")
+        ev = reg.event
+        short = (ev.title[:30] + "…") if len(ev.title) > 30 else ev.title
+        icon = {"registered": "✅", "waiting": "🕒", "cancelled": "❌"}.get(reg.status, "")
         buttons.append([InlineKeyboardButton(
-            text=f"{status_icon} {short_title} ({event.date_time.strftime('%d.%m %H:%M')})",
+            text=f"{icon} {short} ({ev.date_time.strftime('%d.%m %H:%M')})",
             callback_data=f"myreg_{reg.id}"
         )])
     buttons.append([InlineKeyboardButton(text="🔙 В главное меню", callback_data="main_menu")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-def registration_card_keyboard(reg_id: int, event_id: int, can_cancel: bool = True):
-    """Клавиатура внутри карточки записи"""
+def registration_card_keyboard(reg_id: int, event_id: int, can_cancel: bool):
     buttons = []
     if can_cancel:
         buttons.append([InlineKeyboardButton(text="❌ Отменить запись", callback_data=f"cancel_reg_{event_id}")])
