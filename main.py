@@ -1,5 +1,4 @@
-import asyncio
-import os
+import asyncio, os
 from aiohttp import web
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, StateFilter, Command
@@ -7,99 +6,35 @@ from aiogram.types import BotCommand
 
 from config import BOT_TOKEN, engine
 from models import Base
-from states import (
-    Registration as RegState,
-    ProfileEdit,
-    FeedbackFlow,
-    AdminEventCreate,
-    AdminEventEdit,
-    AdminBroadcast,
-)
+from states import Registration as RegState, ProfileEdit, FeedbackFlow
 from handlers import (
-    cmd_start,
-    process_phone_contact,
-    process_phone_manually,
-    process_full_name,
-    process_gender,
-    process_birthday,
-    main_menu_handler,
-    profile_menu_handler,
-    process_callback_main_menu,
-    edit_full_name,
-    edit_phone,
-    edit_gender_callback,
-    edit_birthday,
-    edit_vk,
-    edit_tg_username,
-    edit_email,
-    show_events,
-    event_detail,
-    register_for_event,
-    cancel_reg_handler,
-    my_registrations,
-    my_registration_detail,
-    start_feedback,
-    feedback_chosen,
-    save_feedback,
-    # Админ-панель бота
-    admin_panel,
-    admin_users_list,
-    admin_events_list,
-    admin_feedbacks_list,
-    admin_event_create_start,
-    admin_event_create_title,
-    admin_event_create_description,
-    admin_event_create_date,
-    admin_event_create_time,
-    admin_event_create_location,
-    admin_event_create_limit,
-    admin_event_create_is_paid,
-    admin_event_edit,
-    admin_event_edit_field,
-    admin_event_edit_value,
-    admin_event_delete,
-    admin_feedback_detail,
-    admin_broadcast_start,
-    admin_broadcast_message,
-    admin_broadcast_confirm,
-    admin_broadcast_cancel,
-    cmd_seed,
-    cmd_menu,
-    echo,
+    cmd_start, process_phone_contact, process_phone_manually, process_full_name,
+    process_gender, process_birthday, main_menu_handler, profile_menu_handler,
+    process_callback_main_menu, edit_full_name, edit_phone, edit_gender_callback,
+    edit_birthday, edit_vk, edit_tg_username, edit_email,
+    show_events, event_detail, register_for_event, cancel_reg_handler,
+    my_registrations, my_registration_detail,
+    start_feedback, feedback_chosen, save_feedback,
+    cmd_seed, cmd_menu, echo,
 )
 from web_admin import (
-    login_page,
-    login_send_code,
-    verify_code,
-    logout,
-    dashboard,
-    users_list,
-    events_list,
-    event_create_form,
-    event_create,
-    event_edit_form,
-    event_edit_post,
-    event_delete,
-    feedbacks_list,
-    broadcast_form,
-    broadcast_send,
+    login_page, login_send_code, verify_code, logout,
+    dashboard, users_list, events_list, event_create_form, event_create,
+    event_edit_form, event_edit_post, event_delete,
+    feedbacks_list, broadcast_form, broadcast_send,
     error_middleware,
 )
 
-# Health check endpoint для Render и UptimeRobot
 async def healthcheck(request):
     return web.Response(text="OK")
 
 async def run_web_server():
     app = web.Application()
-
-    # Middleware для логирования ошибок
     app.middlewares.append(error_middleware)
 
-    # Health check
     app.router.add_get("/", healthcheck)
 
-    # Маршруты веб-админки
+    # Веб-админка
     app.router.add_get("/admin", login_page)
     app.router.add_post("/admin/login", login_send_code)
     app.router.add_post("/admin/verify", verify_code)
@@ -136,21 +71,17 @@ async def main():
     dp.message.register(process_birthday, RegState.waiting_for_birthday)
 
     # Главное меню
-    dp.message.register(
-        main_menu_handler,
-        F.text.in_(["👤 Личный кабинет", "📋 Мои записи", "🎉 Афиша", "💬 Оставить отзыв", "🔧 Админ-панель"])
-    )
+    dp.message.register(main_menu_handler, F.text.in_([
+        "👤 Личный кабинет", "📋 Мои записи", "🎉 Афиша", "💬 Оставить отзыв"
+    ]))
 
     # Профиль
     dp.callback_query.register(process_callback_main_menu, F.data == "main_menu")
-    dp.callback_query.register(
-        profile_menu_handler,
-        F.data.in_([
-            "edit_full_name", "edit_phone", "edit_gender", "edit_birthday",
-            "edit_vk", "edit_tg_username", "edit_email",
-            "notify_settings", "toggle_notify", "profile_menu"
-        ])
-    )
+    dp.callback_query.register(profile_menu_handler, F.data.in_([
+        "edit_full_name", "edit_phone", "edit_gender", "edit_birthday",
+        "edit_vk", "edit_tg_username", "edit_email",
+        "notify_settings", "toggle_notify", "profile_menu"
+    ]))
     dp.message.register(edit_full_name, ProfileEdit.waiting_for_full_name)
     dp.message.register(edit_phone, ProfileEdit.waiting_for_phone)
     dp.callback_query.register(edit_gender_callback, ProfileEdit.waiting_for_gender, F.data.startswith('gender_'))
@@ -173,40 +104,11 @@ async def main():
     dp.callback_query.register(feedback_chosen, F.data.startswith("feedback_"))
     dp.message.register(save_feedback, FeedbackFlow.waiting_for_text)
 
-    # Админ-панель бота
-    dp.callback_query.register(admin_panel, F.data == "admin_panel")
-    dp.callback_query.register(admin_users_list, F.data.startswith("admin_users_"))
-    dp.callback_query.register(admin_events_list, F.data.startswith("admin_events_"))
-    dp.callback_query.register(admin_feedbacks_list, F.data.startswith("admin_feedbacks_"))
-    dp.callback_query.register(admin_event_create_start, F.data == "admin_event_create")
-    dp.callback_query.register(admin_event_edit, F.data.startswith("admin_event_edit_"))
-    dp.callback_query.register(admin_event_edit_field, F.data.startswith("editfield_"))
-    dp.callback_query.register(admin_event_delete, F.data.startswith("admin_event_delete_"))
-    dp.callback_query.register(admin_feedback_detail, F.data.startswith("admin_fb_"))
-    dp.callback_query.register(admin_broadcast_start, F.data == "admin_broadcast")
-    dp.callback_query.register(admin_broadcast_confirm, F.data == "broadcast_confirm")
-    dp.callback_query.register(admin_broadcast_cancel, F.data == "broadcast_cancel")
-
-    # Состояния создания мероприятия
-    dp.message.register(admin_event_create_title, AdminEventCreate.waiting_for_title)
-    dp.message.register(admin_event_create_description, AdminEventCreate.waiting_for_description)
-    dp.message.register(admin_event_create_date, AdminEventCreate.waiting_for_date)
-    dp.message.register(admin_event_create_time, AdminEventCreate.waiting_for_time)
-    dp.message.register(admin_event_create_location, AdminEventCreate.waiting_for_location)
-    dp.message.register(admin_event_create_limit, AdminEventCreate.waiting_for_limit)
-    dp.message.register(admin_event_create_is_paid, AdminEventCreate.waiting_for_is_paid)
-
-    dp.message.register(admin_event_edit_value, AdminEventEdit.waiting_for_value)
-    dp.message.register(admin_broadcast_message, AdminBroadcast.waiting_for_message)
-    dp.callback_query.register(admin_broadcast_confirm, AdminBroadcast.confirm, F.data == "broadcast_confirm")
-    dp.callback_query.register(admin_broadcast_cancel, AdminBroadcast.confirm, F.data == "broadcast_cancel")
-
-    # Общие команды
+    # Команды
     dp.message.register(cmd_seed, Command("seed"))
     dp.message.register(cmd_menu, Command("menu"))
     dp.message.register(echo, StateFilter(None))
 
-    # Создание таблиц БД
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
@@ -216,10 +118,7 @@ async def main():
         BotCommand(command="seed", description="(админ) Тестовые мероприятия"),
     ])
 
-    await asyncio.gather(
-        run_web_server(),
-        dp.start_polling(bot),
-    )
+    await asyncio.gather(run_web_server(), dp.start_polling(bot))
 
 if __name__ == '__main__':
     asyncio.run(main())
