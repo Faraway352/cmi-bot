@@ -1,5 +1,4 @@
-import os
-import secrets
+import os, secrets
 from datetime import datetime, timedelta
 from aiohttp import web, ClientSession
 from sqlalchemy import select, func
@@ -64,7 +63,6 @@ def base_html(title, content):
 </body>
 </html>"""
 
-# ---------- Страница входа ----------
 async def login_page(request):
     if request.cookies.get('admin_token') and request.cookies['admin_token'] in SESSIONS:
         return web.HTTPFound('/admin/dashboard')
@@ -90,7 +88,10 @@ async def login_send_code(request):
         return web.Response(text="Неверный Telegram ID. <a href='/admin'>Назад</a>", content_type='text/html')
     tg_id = int(tg_id)
     async with async_session() as session:
-        user = await session.get(User, tg_id)
+        # Ищем пользователя по telegram_id, а не по id!
+        stmt = select(User).where(User.telegram_id == tg_id)
+        result = await session.execute(stmt)
+        user = result.scalar_one_or_none()
         if not user or user.role != 'admin':
             return web.Response(text="Этот пользователь не администратор. <a href='/admin'>Назад</a>", content_type='text/html')
         code = str(secrets.randbelow(10**6)).zfill(6)
@@ -144,10 +145,7 @@ async def logout(request):
 async def send_telegram_code(chat_id, code):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     async with ClientSession() as session:
-        payload = {
-            "chat_id": chat_id,
-            "text": f"Ваш код для входа в админ-панель: {code}\nДействителен 5 минут."
-        }
+        payload = {"chat_id": chat_id, "text": f"Ваш код для входа в админ-панель: {code}\nДействителен 5 минут."}
         async with session.post(url, json=payload) as resp:
             if resp.status != 200:
                 text = await resp.text()
@@ -271,12 +269,9 @@ async def event_create(request):
         return web.Response(text="Неверный формат даты. <a href='/admin/events/create'>Назад</a>", content_type='text/html')
     async with async_session() as session:
         event = Event(
-            title=data['title'],
-            description=data.get('description'),
-            date_time=dt,
-            location=data.get('location'),
-            participants_limit=int(data.get('limit', 0)),
-            is_paid=bool(data.get('is_paid')),
+            title=data['title'], description=data.get('description'), date_time=dt,
+            location=data.get('location'), participants_limit=int(data.get('limit', 0)),
+            is_paid=bool(data.get('is_paid'))
         )
         session.add(event)
         await session.commit()
