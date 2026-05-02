@@ -2,12 +2,12 @@ import asyncio
 import os
 from aiohttp import web
 from aiogram import Bot, Dispatcher, F
-from aiogram.filters import CommandStart, StateFilter
+from aiogram.filters import CommandStart, StateFilter, Command
 from aiogram.types import BotCommand
 
 from config import BOT_TOKEN, engine
 from models import Base
-from states import Registration
+from states import Registration, ProfileEdit
 from handlers import (
     cmd_start,
     process_phone_contact,
@@ -15,6 +15,14 @@ from handlers import (
     process_full_name,
     process_gender,
     process_birthday,
+    main_menu_handler,
+    profile_menu_handler,
+    process_callback_main_menu,
+    edit_full_name,
+    edit_phone,
+    edit_gender_callback,
+    edit_birthday,
+    cmd_menu,
     echo,
 )
 
@@ -35,19 +43,44 @@ async def main():
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher()
 
+    # ---- Регистрация ---
     dp.message.register(cmd_start, CommandStart())
     dp.message.register(process_phone_contact, Registration.waiting_for_phone, F.contact)
     dp.message.register(process_phone_manually, Registration.waiting_for_phone)
     dp.message.register(process_full_name, Registration.waiting_for_full_name)
     dp.callback_query.register(process_gender, Registration.waiting_for_gender, F.data.startswith('gender_'))
     dp.message.register(process_birthday, Registration.waiting_for_birthday)
+
+    # ---- Главное меню (обычные кнопки) ----
+    dp.message.register(main_menu_handler, F.text.in_([
+        "👤 Личный кабинет", "📋 Мои записи", "🎉 Афиша", "💬 Оставить отзыв"
+    ]))
+
+    # ---- Личный кабинет (inline-кнопки) ----
+    dp.callback_query.register(profile_menu_handler, F.data.in_([
+        "edit_full_name", "edit_phone", "edit_gender", "edit_birthday",
+        "notify_settings", "profile_menu", "main_menu", "toggle_notify"
+    ]))
+
+    # ---- Редактирование профиля (состояния) ----
+    dp.message.register(edit_full_name, ProfileEdit.waiting_for_full_name)
+    dp.message.register(edit_phone, ProfileEdit.waiting_for_phone)
+    dp.callback_query.register(edit_gender_callback, ProfileEdit.waiting_for_gender, F.data.startswith('gender_'))
+    dp.message.register(edit_birthday, ProfileEdit.waiting_for_birthday)
+
+    # ---- Вспомогательные команды ----
+    dp.message.register(cmd_menu, Command("menu"))
+
+    # ---- Эхо ----
     dp.message.register(echo, StateFilter(None))
 
+    # Создаём таблицы (если ещё не)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
     await bot.set_my_commands([
-        BotCommand(command="start", description="Начать/перезапустить")
+        BotCommand(command="start", description="Начать/перезапустить"),
+        BotCommand(command="menu", description="Открыть главное меню")
     ])
 
     await asyncio.gather(
