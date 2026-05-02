@@ -6,14 +6,12 @@ from sqlalchemy import select, func
 from config import async_session, BOT_TOKEN
 from models import User, Event, Feedback
 
-# Хранилище сессий (в памяти, для прототипа)
-SESSIONS = {}          # token -> telegram_id
-PENDING_CODES = {}     # telegram_id -> (code, timestamp)
+SESSIONS = {}
+PENDING_CODES = {}
 
 def generate_token():
     return secrets.token_hex(32)
 
-# Middleware для вывода ошибок в консоль
 @web.middleware
 async def error_middleware(request, handler):
     try:
@@ -33,7 +31,6 @@ def require_admin(func):
         return await func(request)
     return wrapper
 
-# ---------- HTML-шаблон ----------
 def base_html(title, content):
     return f"""<!DOCTYPE html>
 <html lang="ru">
@@ -350,7 +347,6 @@ async def feedbacks_list(request):
         feedbacks = (await session.execute(select(Feedback).order_by(Feedback.created_at.desc()).offset(offset).limit(per_page))).scalars().all()
     rows = ""
     for fb in feedbacks:
-        # получаем пользователя и мероприятие внутри существующей сессии
         async with async_session() as session:
             user = await session.get(User, fb.user_id)
             event = await session.get(Event, fb.events_id) if fb.events_id else None
