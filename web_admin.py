@@ -1,5 +1,4 @@
 import os
-import re
 import secrets
 from datetime import datetime, timedelta
 from aiohttp import web, ClientSession
@@ -14,8 +13,18 @@ PENDING_CODES = {}     # telegram_id -> (code, timestamp)
 def generate_token():
     return secrets.token_hex(32)
 
+# Middleware для вывода ошибок в консоль
+@web.middleware
+async def error_middleware(request, handler):
+    try:
+        return await handler(request)
+    except Exception as e:
+        import traceback
+        print("ERROR in admin panel:")
+        traceback.print_exc()
+        return web.Response(text=f"500 Internal Server Error\n\n{type(e).__name__}: {e}", status=500)
+
 def require_admin(func):
-    """Декоратор для проверки админской сессии"""
     async def wrapper(request):
         token = request.cookies.get('admin_token')
         if not token or token not in SESSIONS:
@@ -24,8 +33,8 @@ def require_admin(func):
         return await func(request)
     return wrapper
 
-# ---------- HTML-шаблоны (с Tailwind CDN) ----------
-def base_html(title, content, user=None):
+# ---------- HTML-шаблон ----------
+def base_html(title, content):
     return f"""<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -38,7 +47,6 @@ def base_html(title, content, user=None):
     <nav class="bg-indigo-600 p-4 text-white flex justify-between">
         <span class="text-xl font-bold">ЦМИ Админ</span>
         <div>
-            <span class="mr-4">Администратор</span>
             <a href="/admin/logout" class="underline">Выйти</a>
         </div>
     </nav>
@@ -136,7 +144,6 @@ async def logout(request):
     resp.del_cookie('admin_token')
     return resp
 
-# ---------- Отправка кода в Telegram ----------
 async def send_telegram_code(chat_id, code):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     async with ClientSession() as session:
@@ -343,8 +350,10 @@ async def feedbacks_list(request):
         feedbacks = (await session.execute(select(Feedback).order_by(Feedback.created_at.desc()).offset(offset).limit(per_page))).scalars().all()
     rows = ""
     for fb in feedbacks:
-        user = await (await async_session()).get(User, fb.user_id)  # здесь неэффективно, но для простоты оставим
-        event = await (await async_session()).get(Event, fb.events_id) if fb.events_id else None
+        # получаем пользователя и мероприятие внутри существующей сессии
+        async with async_session() as session:
+            user = await session.get(User, fb.user_id)
+            event = await session.get(Event, fb.events_id) if fb.events_id else None
         rows += f"""<tr class="border-b">
             <td class="p-2">{fb.id}</td>
             <td class="p-2">{user.full_name if user else 'Неизв.'}</td>
