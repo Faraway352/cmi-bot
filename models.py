@@ -19,8 +19,8 @@ class User(Base):
     birthday = Column(Date)
     role = Column(String(20), default='user')
     vk_url = Column(String(255))
-    tg_username = Column(String(100))          # <-- новое поле
-    email = Column(String(150))                # <-- новое поле
+    tg_username = Column(String(100))
+    email = Column(String(150))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     is_archived = Column(Boolean, default=False)
 
@@ -50,6 +50,7 @@ class Registration(Base):
     status = Column(String(20), nullable=False, default='registered')
     queue_position = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    reminder_sent = Column(Boolean, default=False)          # <-- новое поле
 
 
 class Feedback(Base):
