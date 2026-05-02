@@ -3,7 +3,8 @@ import os
 from aiohttp import web
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, StateFilter
-from aiogram.types import BotCommand, FSInputFile    # ← изменено: FSInputFile вместо InputFile
+from aiogram.types import BotCommand, FSInputFile
+from aiogram.methods import SetMyPhoto       # <-- добавлен импорт
 
 from config import BOT_TOKEN, engine
 from models import Base
@@ -49,20 +50,20 @@ async def main():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    # Устанавливаем аватарку бота
+    # Устанавливаем аватарку бота (через прямой вызов метода)
     try:
-        photo = FSInputFile("ava.png")          # ← исправлено
-        await bot.set_my_photo(photo)
+        photo = FSInputFile("ava.png")
+        await bot(SetMyPhoto(photo=photo))
         print("Аватарка обновлена")
     except Exception as e:
         print(f"Не удалось установить аватарку: {e}")
 
-    # Устанавливаем команды бота
+    # Команды бота
     await bot.set_my_commands([
         BotCommand(command="start", description="Начать/перезапустить")
     ])
 
-    # Запускаем веб-сервер и поллинг параллельно
+    # Запуск веб-сервера и поллинга
     await asyncio.gather(
         run_web_server(),
         dp.start_polling(bot)
