@@ -117,16 +117,6 @@ async def main():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    # ===== ВРЕМЕННЫЙ БЛОК: добавить колонку reminder_sent =====
-    # Удалить после первого успешного деплоя!
-    from sqlalchemy import text
-    async with engine.begin() as conn:
-        await conn.execute(text(
-            "ALTER TABLE registrations ADD COLUMN IF NOT EXISTS reminder_sent BOOLEAN DEFAULT FALSE"
-        ))
-        print("=== Колонка reminder_sent проверена/добавлена ===")
-    # ===== КОНЕЦ ВРЕМЕННОГО БЛОКА =====
-
     await bot.set_my_commands([
         BotCommand(command="start", description="Начать/перезапустить"),
         BotCommand(command="menu", description="Открыть главное меню"),
