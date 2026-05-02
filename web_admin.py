@@ -88,7 +88,6 @@ async def login_send_code(request):
         return web.Response(text="Неверный Telegram ID. <a href='/admin'>Назад</a>", content_type='text/html')
     tg_id = int(tg_id)
     async with async_session() as session:
-        # Ищем пользователя по telegram_id, а не по id!
         stmt = select(User).where(User.telegram_id == tg_id)
         result = await session.execute(stmt)
         user = result.scalar_one_or_none()
@@ -188,17 +187,17 @@ async def users_list(request):
     rows = ""
     for u in users:
         rows += f"""<tr class="border-b">
-            <td class="p-2">{u.id}</td>
-            <td class="p-2">{u.full_name}</td>
-            <td class="p-2">{u.telegram_id}</td>
-            <td class="p-2">{u.phone}</td>
-            <td class="p-2">{u.role}</td>
-            <td class="p-2">{u.created_at.strftime('%d.%m.%Y') if u.created_at else ''}</td>
+            <td class="p-2 text-center">{u.id}</td>
+            <td class="p-2 text-center">{u.full_name}</td>
+            <td class="p-2 text-center">{u.telegram_id}</td>
+            <td class="p-2 text-center">{u.phone}</td>
+            <td class="p-2 text-center">{u.role}</td>
+            <td class="p-2 text-center">{u.created_at.strftime('%d.%m.%Y') if u.created_at else ''}</td>
         </tr>"""
     content = f"""
     <h1 class="text-2xl font-bold mb-4">Пользователи</h1>
     <table class="w-full bg-white shadow rounded">
-        <thead class="bg-gray-200"><tr><th class="p-2">ID</th><th class="p-2">ФИО</th><th class="p-2">Telegram ID</th><th class="p-2">Телефон</th><th class="p-2">Роль</th><th class="p-2">Дата рег.</th></tr></thead>
+        <thead class="bg-gray-200"><tr><th class="p-2 text-center">ID</th><th class="p-2 text-center">ФИО</th><th class="p-2 text-center">Telegram ID</th><th class="p-2 text-center">Телефон</th><th class="p-2 text-center">Роль</th><th class="p-2 text-center">Дата рег.</th></tr></thead>
         <tbody>{rows}</tbody>
     </table>
     <div class="mt-4 flex gap-2">
@@ -219,13 +218,13 @@ async def events_list(request):
     rows = ""
     for e in events:
         rows += f"""<tr class="border-b">
-            <td class="p-2">{e.id}</td>
-            <td class="p-2">{e.title}</td>
-            <td class="p-2">{e.date_time.strftime('%d.%m.%Y %H:%M')}</td>
-            <td class="p-2">{e.location}</td>
-            <td class="p-2">{e.participants_limit}</td>
-            <td class="p-2">{e.status}</td>
-            <td class="p-2">
+            <td class="p-2 text-center">{e.id}</td>
+            <td class="p-2 text-center">{e.title}</td>
+            <td class="p-2 text-center">{e.date_time.strftime('%d.%m.%Y %H:%M')}</td>
+            <td class="p-2 text-center">{e.location}</td>
+            <td class="p-2 text-center">{e.participants_limit}</td>
+            <td class="p-2 text-center">{e.status}</td>
+            <td class="p-2 text-center">
                 <a href="/admin/events/edit/{e.id}" class="text-blue-600 underline">Ред.</a> |
                 <a href="/admin/events/delete/{e.id}" class="text-red-600 underline" onclick="return confirm('Удалить?')">Удл.</a>
             </td>
@@ -236,7 +235,7 @@ async def events_list(request):
         <a href="/admin/events/create" class="bg-green-600 text-white px-4 py-2 rounded">+ Создать</a>
     </div>
     <table class="w-full bg-white shadow rounded">
-        <thead class="bg-gray-200"><tr><th class="p-2">ID</th><th class="p-2">Название</th><th class="p-2">Дата</th><th class="p-2">Место</th><th class="p-2">Лимит</th><th class="p-2">Статус</th><th class="p-2">Действия</th></tr></thead>
+        <thead class="bg-gray-200"><tr><th class="p-2 text-center">ID</th><th class="p-2 text-center">Название</th><th class="p-2 text-center">Дата</th><th class="p-2 text-center">Место</th><th class="p-2 text-center">Лимит</th><th class="p-2 text-center">Статус</th><th class="p-2 text-center">Действия</th></tr></thead>
         <tbody>{rows}</tbody>
     </table>
     <div class="mt-4 flex gap-2">
@@ -346,16 +345,16 @@ async def feedbacks_list(request):
             user = await session.get(User, fb.user_id)
             event = await session.get(Event, fb.events_id) if fb.events_id else None
         rows += f"""<tr class="border-b">
-            <td class="p-2">{fb.id}</td>
-            <td class="p-2">{user.full_name if user else 'Неизв.'}</td>
-            <td class="p-2">{event.title if event else 'Центр'}</td>
-            <td class="p-2">{fb.content[:100]}</td>
-            <td class="p-2">{fb.created_at.strftime('%d.%m.%Y')}</td>
+            <td class="p-2 text-center">{fb.id}</td>
+            <td class="p-2 text-center">{user.full_name if user else 'Неизв.'}</td>
+            <td class="p-2 text-center">{event.title if event else 'Центр'}</td>
+            <td class="p-2 text-center">{fb.content[:100]}</td>
+            <td class="p-2 text-center">{fb.created_at.strftime('%d.%m.%Y')}</td>
         </tr>"""
     content = f"""
     <h1 class="text-2xl font-bold mb-4">Отзывы</h1>
     <table class="w-full bg-white shadow rounded">
-        <thead class="bg-gray-200"><tr><th class="p-2">ID</th><th class="p-2">Пользователь</th><th class="p-2">Мероприятие</th><th class="p-2">Текст</th><th class="p-2">Дата</th></tr></thead>
+        <thead class="bg-gray-200"><tr><th class="p-2 text-center">ID</th><th class="p-2 text-center">Пользователь</th><th class="p-2 text-center">Мероприятие</th><th class="p-2 text-center">Текст</th><th class="p-2 text-center">Дата</th></tr></thead>
         <tbody>{rows}</tbody>
     </table>
     <div class="mt-4 flex gap-2">
