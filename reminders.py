@@ -7,12 +7,11 @@ from aiohttp import ClientSession
 
 async def send_reminders():
     """Проверяет мероприятия, которые начнутся ровно через 24 часа, и рассылает напоминания."""
-    now = datetime.now()
+    now = datetime.now()  # серверное время (UTC)
     window_start = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=24)
     window_end = window_start + timedelta(hours=1)
 
     async with async_session() as session:
-        # Находим мероприятия в нужном окне
         stmt = select(Event).where(
             Event.date_time >= window_start,
             Event.date_time < window_end,
@@ -22,7 +21,6 @@ async def send_reminders():
         events = (await session.execute(stmt)).scalars().all()
 
         for event in events:
-            # Находим все регистрации, которым ещё не отправили напоминание
             reg_stmt = select(Registration).where(
                 Registration.events_id == event.id,
                 Registration.status == 'registered',
@@ -45,7 +43,6 @@ async def send_reminders():
                     if success:
                         ids_to_update.append(reg.id)
 
-            # Помечаем отправленные регистрации
             if ids_to_update:
                 await session.execute(
                     update(Registration)
