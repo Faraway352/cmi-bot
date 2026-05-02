@@ -78,13 +78,6 @@ async def main():
     dp.message.register(cmd_menu, Command("menu"))
     dp.message.register(echo, StateFilter(None))
 
-    # ===== ВРЕМЕННЫЙ БЛОК ДЛЯ СБРОСА СТАРОЙ БАЗЫ =====
-    # УДАЛИТЬ после первого успешного деплоя!
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        print("=== Old tables dropped ===")
-    # ===== КОНЕЦ ВРЕМЕННОГО БЛОКА =====
-
     # Создаём таблицы заново
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
