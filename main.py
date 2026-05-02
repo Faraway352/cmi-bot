@@ -32,7 +32,6 @@ from handlers import (
     my_registrations,
     my_registration_detail,
     cmd_seed,
-    cmd_admin,          # <-- добавлен импорт
     cmd_menu,
     echo,
 )
@@ -97,7 +96,6 @@ async def main():
 
     # ---- Команды ----
     dp.message.register(cmd_seed, Command("seed"))
-    dp.message.register(cmd_admin, Command("admin"))   # <-- регистрация
     dp.message.register(cmd_menu, Command("menu"))
     dp.message.register(echo, StateFilter(None))
 
@@ -109,8 +107,7 @@ async def main():
     await bot.set_my_commands([
         BotCommand(command="start", description="Начать/перезапустить"),
         BotCommand(command="menu", description="Открыть главное меню"),
-        BotCommand(command="seed", description="(админ) Создать тестовые мероприятия"),
-        BotCommand(command="admin", description="Временная команда для получения прав администратора")
+        BotCommand(command="seed", description="(админ) Создать тестовые мероприятия")
     ])
 
     # ---- Запуск веб-сервера и поллинга ----
