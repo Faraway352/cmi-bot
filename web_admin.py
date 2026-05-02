@@ -1,16 +1,15 @@
 import os
 import re
-import uuid
 import secrets
 from datetime import datetime, timedelta
 from aiohttp import web, ClientSession
-from sqlalchemy import select, func, update, delete
+from sqlalchemy import select, func
 from config import async_session, BOT_TOKEN
-from models import User, Event, Feedback, AdminAction, BroadcastHistory
+from models import User, Event, Feedback
 
 # Хранилище сессий (в памяти, для прототипа)
-SESSIONS = {}  # token -> telegram_id
-PENDING_CODES = {}  # telegram_id -> code (временный)
+SESSIONS = {}          # token -> telegram_id
+PENDING_CODES = {}     # telegram_id -> (code, timestamp)
 
 def generate_token():
     return secrets.token_hex(32)
@@ -85,15 +84,12 @@ async def login_send_code(request):
     if not tg_id or not tg_id.isdigit():
         return web.Response(text="Неверный Telegram ID. <a href='/admin'>Назад</a>", content_type='text/html')
     tg_id = int(tg_id)
-    # Проверяем, является ли пользователь админом
     async with async_session() as session:
         user = await session.get(User, tg_id)
         if not user or user.role != 'admin':
             return web.Response(text="Этот пользователь не администратор. <a href='/admin'>Назад</a>", content_type='text/html')
-        # Генерируем код
         code = str(secrets.randbelow(10**6)).zfill(6)
         PENDING_CODES[tg_id] = (code, datetime.now())
-        # Отправляем код через бота
         try:
             await send_telegram_code(tg_id, code)
         except Exception as e:
@@ -125,7 +121,6 @@ async def verify_code(request):
         return web.Response(text="Код истек. <a href='/admin'>Назад</a>", content_type='text/html')
     if code != stored_code:
         return web.Response(text="Неверный код. <a href='/admin'>Назад</a>", content_type='text/html')
-    # Успешно, создаём сессию
     token = generate_token()
     SESSIONS[token] = tg_id
     del PENDING_CODES[tg_id]
@@ -141,7 +136,7 @@ async def logout(request):
     resp.del_cookie('admin_token')
     return resp
 
-# ---------- Отправка кода через Telegram бота (используем API) ----------
+# ---------- Отправка кода в Telegram ----------
 async def send_telegram_code(chat_id, code):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     async with ClientSession() as session:
@@ -268,7 +263,7 @@ async def event_create(request):
     data = await request.post()
     try:
         dt = datetime.strptime(data['datetime'], "%Y-%m-%d %H:%M")
-    except:
+    except Exception:
         return web.Response(text="Неверный формат даты. <a href='/admin/events/create'>Назад</a>", content_type='text/html')
     async with async_session() as session:
         event = Event(
@@ -277,7 +272,7 @@ async def event_create(request):
             date_time=dt,
             location=data.get('location'),
             participants_limit=int(data.get('limit', 0)),
-            is_paid=bool(data.get('is_paid'))
+            is_paid=bool(data.get('is_paid')),
         )
         session.add(event)
         await session.commit()
@@ -300,11 +295,11 @@ async def event_edit_form(request):
         <label class="block mb-2">Лимит:</label><input type="number" name="limit" value="{event.participants_limit}" class="w-full border p-2 rounded mb-2">
         <label class="block mb-2">Статус:</label>
         <select name="status" class="w-full border p-2 rounded mb-2">
-            <option value="active" {"selected" if event.status == 'active' else ""}>Активно</option>
-            <option value="cancelled" {"selected" if event.status == 'cancelled' else ""}>Отменено</option>
-            <option value="finished" {"selected" if event.status == 'finished' else ""}>Завершено</option>
+            <option value="active" {'selected' if event.status == 'active' else ''}>Активно</option>
+            <option value="cancelled" {'selected' if event.status == 'cancelled' else ''}>Отменено</option>
+            <option value="finished" {'selected' if event.status == 'finished' else ''}>Завершено</option>
         </select>
-        <label class="block mb-2">Платное?</label><input type="checkbox" name="is_paid" value="1" {"checked" if event.is_paid else ""} class="mb-4">
+        <label class="block mb-2">Платное?</label><input type="checkbox" name="is_paid" value="1" {'checked' if event.is_paid else ''} class="mb-4">
         <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Сохранить</button>
     </form>"""
     return web.Response(text=base_html("Редактирование", content), content_type='text/html')
@@ -348,7 +343,7 @@ async def feedbacks_list(request):
         feedbacks = (await session.execute(select(Feedback).order_by(Feedback.created_at.desc()).offset(offset).limit(per_page))).scalars().all()
     rows = ""
     for fb in feedbacks:
-        user = await (await async_session()).get(User, fb.user_id)
+        user = await (await async_session()).get(User, fb.user_id)  # здесь неэффективно, но для простоты оставим
         event = await (await async_session()).get(Event, fb.events_id) if fb.events_id else None
         rows += f"""<tr class="border-b">
             <td class="p-2">{fb.id}</td>
@@ -394,7 +389,7 @@ async def broadcast_send(request):
             async with ClientSession() as http:
                 await http.post(url, json={"chat_id": uid, "text": text})
                 sent += 1
-        except:
+        except Exception:
             pass
     content = f"<p>Рассылка завершена. Отправлено {sent} из {len(users)}.</p><a href='/admin/dashboard'>Назад</a>"
     return web.Response(text=base_html("Результат рассылки", content), content_type='text/html')
