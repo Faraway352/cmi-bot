@@ -8,7 +8,7 @@ from config import async_session
 from models import User
 from states import Registration
 from keyboards import phone_keyboard, gender_keyboard, remove_keyboard
-from validators import is_valid_name, contains_emoji, is_valid_birth_date
+from validators import is_valid_full_name, contains_emoji, is_valid_birthday
 
 async def cmd_start(message: types.Message, state: FSMContext):
     async with async_session() as session:
@@ -17,7 +17,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
         user = result.scalar_one_or_none()
         if user:
             await message.answer(
-                f"С возвращением, {user.first_name}!\n"
+                f"С возвращением, {user.full_name}!\n"
                 "Вы уже зарегистрированы.\n"
                 "Главное меню станет доступно позже."
             )
@@ -25,7 +25,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
 
     await message.answer(
         "Добро пожаловать! 👋 Я здесь, чтобы вам помочь.\n\n"
-        "Я бот, который поможет вам с любой информацией о нашем центре.\n\n"
+        "Я бот, который поможет вам с любой информацией о нашем центре.\n"
         "Хотите узнать о мероприятиях или записаться на них?\n\n"
         "Давайте начнем!",
         reply_markup=remove_keyboard()
@@ -36,8 +36,8 @@ async def cmd_start(message: types.Message, state: FSMContext):
 async def process_phone_contact(message: types.Message, state: FSMContext):
     phone = message.contact.phone_number
     await state.update_data(phone=phone)
-    await message.answer("✅ Номер получен. Введите ваше **имя**.", reply_markup=remove_keyboard())
-    await state.set_state(Registration.waiting_for_first_name)
+    await message.answer("✅ Номер получен. Введите ваше ФИО (полностью).", reply_markup=remove_keyboard())
+    await state.set_state(Registration.waiting_for_full_name)
 
 async def process_phone_manually(message: types.Message, state: FSMContext):
     phone = message.text.strip()
@@ -45,46 +45,32 @@ async def process_phone_manually(message: types.Message, state: FSMContext):
         await message.answer("❌ Введите номер в формате +7XXXXXXXXXX или нажмите кнопку ниже.")
         return
     await state.update_data(phone=phone)
-    await message.answer("Теперь введите ваше имя.", reply_markup=remove_keyboard())
-    await state.set_state(Registration.waiting_for_first_name)
+    await message.answer("Теперь введите ваше ФИО (полностью).", reply_markup=remove_keyboard())
+    await state.set_state(Registration.waiting_for_full_name)
 
-async def process_first_name(message: types.Message, state: FSMContext):
-    name = message.text.strip()
-    if contains_emoji(name):
-        await message.answer("❌ Имя не должно содержать эмодзи. Попробуйте ещё раз.")
+async def process_full_name(message: types.Message, state: FSMContext):
+    full_name = message.text.strip()
+    if contains_emoji(full_name):
+        await message.answer("❌ ФИО не должно содержать эмодзи. Попробуйте ещё раз.")
         return
-    if not is_valid_name(name):
-        await message.answer("❌ Имя должно содержать только буквы (кириллица или латиница). Попробуйте ещё раз.")
+    if not is_valid_full_name(full_name):
+        await message.answer("❌ ФИО должно содержать только буквы и минимум два слова. Попробуйте ещё раз.")
         return
-    await state.update_data(first_name=name)
-    await message.answer("Введите вашу фамилию.")
-    await state.set_state(Registration.waiting_for_last_name)
-
-async def process_last_name(message: types.Message, state: FSMContext):
-    last_name = message.text.strip()
-    if contains_emoji(last_name):
-        await message.answer("❌ Фамилия не должна содержать эмодзи. Попробуйте ещё раз.")
-        return
-    if not is_valid_name(last_name):
-        await message.answer("❌ Фамилия должна содержать только буквы. Попробуйте ещё раз.")
-        return
-    await state.update_data(last_name=last_name)
+    await state.update_data(full_name=full_name)
     await message.answer("Укажите ваш пол:", reply_markup=gender_keyboard())
     await state.set_state(Registration.waiting_for_gender)
 
 async def process_gender(callback: types.CallbackQuery, state: FSMContext):
-    gender = 'male' if callback.data == 'gender_male' else 'female'
+    gender = 'Муж' if callback.data == 'gender_male' else 'Жен'
     await state.update_data(gender=gender)
     await callback.message.edit_reply_markup()
-    await callback.message.answer(
-        "Введите вашу дату рождения в формате ДД.ММ.ГГГГ (например, 01.01.2000):"
-    )
-    await state.set_state(Registration.waiting_for_birth_date)
+    await callback.message.answer("Введите вашу дату рождения в формате ДД.ММ.ГГГГ (например, 01.01.2000):")
+    await state.set_state(Registration.waiting_for_birthday)
     await callback.answer()
 
-async def process_birth_date(message: types.Message, state: FSMContext):
+async def process_birthday(message: types.Message, state: FSMContext):
     birth_text = message.text.strip()
-    if not is_valid_birth_date(birth_text):
+    if not is_valid_birthday(birth_text):
         await message.answer("Не похоже на дату рождения. Попробуйте ещё раз.")
         return
 
@@ -96,10 +82,9 @@ async def process_birth_date(message: types.Message, state: FSMContext):
         new_user = User(
             telegram_id=message.from_user.id,
             phone=data.get('phone'),
-            first_name=data.get('first_name'),
-            last_name=data.get('last_name'),
+            full_name=data.get('full_name'),
             gender=data.get('gender'),
-            birth_date=b_date,
+            birthday=b_date,
             role='user'
         )
         session.add(new_user)
@@ -107,8 +92,8 @@ async def process_birth_date(message: types.Message, state: FSMContext):
 
     await message.answer(
         f"🎉 Регистрация завершена!\n\n"
-        f"Имя: {data['first_name']} {data['last_name']}\n"
-        f"Пол: {'Мужской' if data['gender']=='male' else 'Женский'}\n"
+        f"ФИО: {data['full_name']}\n"
+        f"Пол: {data['gender']}\n"
         f"Дата рождения: {b_date.strftime('%d.%m.%Y')}\n\n"
         f"Добро пожаловать! Скоро здесь появится главное меню."
     )
