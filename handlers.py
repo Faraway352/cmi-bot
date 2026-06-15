@@ -12,7 +12,7 @@ from keyboards import (
     main_menu_keyboard, profile_menu_keyboard, notify_settings_keyboard,
     events_list_keyboard, event_card_keyboard,
     my_registrations_keyboard, registration_card_keyboard,
-    feedback_event_keyboard
+    feedback_event_keyboard, skip_keyboard
 )
 from validators import (
     is_valid_full_name, contains_emoji, is_valid_birthday,
