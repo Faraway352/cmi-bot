@@ -16,7 +16,8 @@ from handlers import (
     show_events, event_detail, register_for_event, cancel_reg_handler,
     my_registrations, my_registration_detail,
     start_feedback, feedback_chosen, save_feedback,
-    cmd_seed, cmd_menu, echo,
+    cmd_seed, cmd_menu, echo, process_tg_username, skip_tg_username, process_vk, skip_vk,
+    process_email, skip_email,
 )
 from web_admin import (
     login_page, login_send_code, verify_code, logout,
