@@ -156,14 +156,13 @@ async def process_birthday(message: types.Message, state: FSMContext):
         )
         session.add(new_user)
         await session.commit()
+    # Переход к сбору tg_username вместо завершения
     await message.answer(
-        f"🎉 Регистрация завершена!\n\n"
-        f"ФИО: {data['full_name']}\nПол: {data['gender']}\n"
-        f"Дата рождения: {b_date.strftime('%d.%m.%Y')}\n\nДобро пожаловать!",
-        reply_markup=main_menu_keyboard()
+        "📱 Введите ваш Telegram username (например, @example) или нажмите «Пропустить»:",
+        reply_markup=skip_keyboard()
     )
-    await state.clear()
-
+    await state.set_state(RegState.waiting_for_tg_username)
+    
 # ---------- Главное меню ----------
 async def main_menu_handler(message: types.Message, state: FSMContext):
     user = await get_user(message.from_user.id)
