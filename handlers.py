@@ -162,6 +162,75 @@ async def process_birthday(message: types.Message, state: FSMContext):
         reply_markup=skip_keyboard()
     )
     await state.set_state(RegState.waiting_for_tg_username)
+
+# --- Новые шаги регистрации: tg_username, vk, email ---
+async def process_tg_username(message: types.Message, state: FSMContext):
+    username = message.text.strip()
+    if not is_valid_tg_username(username):
+        await message.answer("❌ Некорректный username. Попробуйте ещё раз или нажмите «Пропустить».")
+        return
+    if username.startswith('@'):
+        username = username[1:]
+    user = await get_user(message.from_user.id)
+    async with async_session() as session:
+        user = await session.merge(user)
+        user.tg_username = username
+        await session.commit()
+    await message.answer("🔗 Введите вашу ссылку на VK (например, https://vk.com/id123) или нажмите «Пропустить»:", reply_markup=skip_keyboard())
+    await state.set_state(RegState.waiting_for_vk)
+
+async def skip_tg_username(callback: types.CallbackQuery, state: FSMContext):
+    await callback.message.edit_text("🔗 Введите вашу ссылку на VK (например, https://vk.com/id123) или нажмите «Пропустить»:", reply_markup=skip_keyboard())
+    await state.set_state(RegState.waiting_for_vk)
+    await callback.answer()
+
+async def process_vk(message: types.Message, state: FSMContext):
+    vk_url = message.text.strip()
+    if not is_valid_vk_url(vk_url):
+        await message.answer("❌ Некорректная ссылка VK. Попробуйте ещё раз или нажмите «Пропустить».")
+        return
+    user = await get_user(message.from_user.id)
+    async with async_session() as session:
+        user = await session.merge(user)
+        user.vk_url = vk_url
+        await session.commit()
+    await message.answer("✉️ Введите ваш email (например, example@mail.ru) или нажмите «Пропустить»:", reply_markup=skip_keyboard())
+    await state.set_state(RegState.waiting_for_email)
+
+async def skip_vk(callback: types.CallbackQuery, state: FSMContext):
+    await callback.message.edit_text("✉️ Введите ваш email (например, example@mail.ru) или нажмите «Пропустить»:", reply_markup=skip_keyboard())
+    await state.set_state(RegState.waiting_for_email)
+    await callback.answer()
+
+async def process_email(message: types.Message, state: FSMContext):
+    email = message.text.strip()
+    if not is_valid_email(email):
+        await message.answer("❌ Некорректный email. Попробуйте ещё раз или нажмите «Пропустить».")
+        return
+    user = await get_user(message.from_user.id)
+    async with async_session() as session:
+        user = await session.merge(user)
+        user.email = email
+        await session.commit()
+    await finish_registration(message, state)
+
+async def skip_email(callback: types.CallbackQuery, state: FSMContext):
+    await finish_registration(callback.message, state, is_callback=True)
+    await callback.answer()
+
+async def finish_registration(message: types.Message, state: FSMContext, is_callback=False):
+    user = await get_user(message.chat.id)
+    # Финальное сообщение с заполненным профилем
+    await message.answer(
+        f"🎉 Регистрация завершена!\n\n"
+        f"ФИО: {user.full_name}\nПол: {user.gender}\n"
+        f"Дата рождения: {user.birthday.strftime('%d.%m.%Y') if user.birthday else 'не указана'}\n"
+        f"Telegram: @{user.tg_username if user.tg_username else 'не указан'}\n"
+        f"VK: {user.vk_url or 'не указана'}\n"
+        f"Email: {user.email or 'не указан'}\n\nДобро пожаловать!",
+        reply_markup=main_menu_keyboard()
+    )
+    await state.clear()
     
 # ---------- Главное меню ----------
 async def main_menu_handler(message: types.Message, state: FSMContext):
