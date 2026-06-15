@@ -19,6 +19,11 @@ def gender_keyboard():
 def remove_keyboard():
     return ReplyKeyboardRemove()
 
+def skip_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Пропустить", callback_data="skip")]
+    ])
+
 # ---------- Главное меню ----------
 def main_menu_keyboard():
     return ReplyKeyboardMarkup(
