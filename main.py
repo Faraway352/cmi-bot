@@ -24,7 +24,7 @@ from web_admin import (
     dashboard, users_list, events_list, event_create_form, event_create,
     event_edit_form, event_edit_post, event_delete,
     feedbacks_list, broadcast_form, broadcast_send,
-    error_middleware,
+    error_middleware, admin_actions_list,
 )
 from reminders import reminder_loop          # <-- фоновая задача напоминаний
 
@@ -53,6 +53,7 @@ async def run_web_server():
     app.router.add_get("/admin/feedbacks", feedbacks_list)
     app.router.add_get("/admin/broadcast", broadcast_form)
     app.router.add_post("/admin/broadcast", broadcast_send)
+    app.router.add_get("/admin/actions", admin_actions_list)
 
     runner = web.AppRunner(app)
     await runner.setup()
