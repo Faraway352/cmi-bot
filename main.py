@@ -38,6 +38,7 @@ async def run_web_server():
     app.middlewares.append(error_middleware)
 
     app.router.add_get("/", healthcheck)
+    app.router.add_get("/favicon.ico", lambda request: web.Response(status=204))
 
     # Веб-админка
     app.router.add_get("/admin", login_page)
