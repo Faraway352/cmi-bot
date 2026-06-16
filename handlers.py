@@ -1,7 +1,7 @@
 from aiogram import Bot, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import CommandStart, StateFilter, Command
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 from datetime import datetime, date
 
 from config import async_session
@@ -346,6 +346,8 @@ async def profile_menu_handler(callback: types.CallbackQuery, state: FSMContext)
             reply_markup=notify_settings_keyboard(enabled=new_status)
         )
         await callback.answer(f"Уведомления {'включены' if new_status else 'выключены'}")
+    elif action == "delete_account":
+        await delete_account_confirm(callback)
     elif action == "profile_menu":
         await show_profile(callback, user)
     await callback.answer()
@@ -670,6 +672,54 @@ async def save_feedback(message: types.Message, state: FSMContext):
     await message.answer("✅ Спасибо за ваш отзыв!", reply_markup=main_menu_keyboard())
     await state.clear()
 
+# ---------- Удаление аккаунта ----------
+async def delete_account_confirm(callback: types.CallbackQuery):
+    """Запрашивает подтверждение удаления аккаунта."""
+    await callback.message.answer(
+        "⚠️ Вы уверены, что хотите удалить аккаунт?\n"
+        "Все ваши данные (профиль, записи на мероприятия, отзывы) будут безвозвратно удалены.",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Да, удалить", callback_data="delete_account_execute")],
+            [InlineKeyboardButton(text="❌ Нет, оставить", callback_data="profile_menu")]
+        ])
+    )
+    await callback.answer()
+
+async def delete_account_execute(callback: types.CallbackQuery, bot: Bot):
+    """Выполняет удаление аккаунта и всех связанных данных."""
+    user = await get_user(callback.from_user.id)
+    if not user:
+        await callback.answer("Пользователь не найден.")
+        return
+
+    # Отменяем все активные регистрации (чтобы освободить места и продвинуть очередь)
+    async with async_session() as session:
+        active_regs = await session.execute(
+            select(Registration).where(
+                Registration.user_id == user.id,
+                Registration.status.in_(['registered', 'waiting'])
+            )
+        )
+        active_regs = active_regs.scalars().all()
+        for reg in active_regs:
+            await cancel_registration(reg.events_id, user.id, bot)
+
+    # Удаляем все данные пользователя
+    async with async_session() as session:
+        await session.execute(delete(Registration).where(Registration.user_id == user.id))
+        await session.execute(delete(Feedback).where(Feedback.user_id == user.id))
+        await session.execute(delete(NotifySetting).where(NotifySetting.user_id == user.id))
+        # Если есть таблица auth_codes, тоже удаляем (на ваше усмотрение)
+        # await session.execute(delete(AuthCode).where(AuthCode.user_id == user.id))
+        await session.execute(delete(User).where(User.id == user.id))
+        await session.commit()
+
+    await callback.message.answer(
+        "👋 Ваш аккаунт полностью удалён. Если захотите вернуться, просто введите /start.",
+        reply_markup=main_menu_keyboard()
+    )
+    await callback.answer("Аккаунт удалён")
+    
 # ---------- Команда /seed ----------
 async def cmd_seed(message: types.Message):
     user = await get_user(message.from_user.id)
