@@ -47,6 +47,7 @@ def profile_menu_keyboard():
         [InlineKeyboardButton(text="💬 Изменить Telegram", callback_data="edit_tg_username")],
         [InlineKeyboardButton(text="✉️ Изменить Email", callback_data="edit_email")],
         [InlineKeyboardButton(text="🔔 Уведомления", callback_data="notify_settings")],
+        [InlineKeyboardButton(text="🗑 Удалить аккаунт", callback_data="delete_account")],
         [InlineKeyboardButton(text="🔙 Главное меню", callback_data="main_menu")]
     ])
 
