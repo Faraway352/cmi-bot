@@ -73,6 +73,14 @@ async def main():
     dp.callback_query.register(process_gender, RegState.waiting_for_gender, F.data.startswith('gender_'))
     dp.message.register(process_birthday, RegState.waiting_for_birthday)
 
+    # Добавленные шаги регистрации
+    dp.message.register(process_tg_username, RegState.waiting_for_tg_username)
+    dp.callback_query.register(skip_tg_username, RegState.waiting_for_tg_username, F.data == "skip")
+    dp.message.register(process_vk, RegState.waiting_for_vk)
+    dp.callback_query.register(skip_vk, RegState.waiting_for_vk, F.data == "skip")
+    dp.message.register(process_email, RegState.waiting_for_email)
+    dp.callback_query.register(skip_email, RegState.waiting_for_email, F.data == "skip")
+
     # Главное меню
     dp.message.register(main_menu_handler, F.text.in_([
         "👤 Личный кабинет", "📋 Мои записи", "🎉 Афиша", "💬 Оставить отзыв"
