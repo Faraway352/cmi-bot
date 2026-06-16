@@ -5,7 +5,7 @@ from sqlalchemy import select, func
 from datetime import datetime, date
 
 from config import async_session
-from models import User, Event, Registration, Feedback
+from models import User, Event, Registration, Feedback, NotifySetting
 from states import Registration as RegState, ProfileEdit, FeedbackFlow
 from keyboards import (
     phone_keyboard, gender_keyboard, remove_keyboard,
@@ -155,6 +155,12 @@ async def process_birthday(message: types.Message, state: FSMContext):
             role='user'
         )
         session.add(new_user)
+        notify_setting = NotifySetting(
+            user_id=new_user.id,
+            notification_type='event_reminder',
+            is_enabled=True
+        )
+        session.add(notify_setting)
         await session.commit()
     # Переход к сбору tg_username вместо завершения
     await message.answer(
@@ -305,9 +311,41 @@ async def profile_menu_handler(callback: types.CallbackQuery, state: FSMContext)
         await callback.message.answer("Введите ваш email:")
         await state.set_state(ProfileEdit.waiting_for_email)
     elif action == "notify_settings":
-        await callback.message.edit_text("🔔 Настройки уведомлений (в разработке).", reply_markup=notify_settings_keyboard())
+        async with async_session() as session:
+            setting = await session.execute(
+                select(NotifySetting).where(
+                    NotifySetting.user_id == user.id,
+                    NotifySetting.notification_type == 'event_reminder'
+                )
+            )
+            setting = setting.scalar_one_or_none()
+            is_enabled = setting.is_enabled if setting else True
+        await callback.message.edit_text(
+            "🔔 Настройки уведомлений",
+            reply_markup=notify_settings_keyboard(enabled=is_enabled)
+        )
     elif action == "toggle_notify":
-        await callback.answer("Раздел в разработке", show_alert=True)
+        async with async_session() as session:
+            setting = await session.execute(
+                select(NotifySetting).where(
+                    NotifySetting.user_id == user.id,
+                    NotifySetting.notification_type == 'event_reminder'
+                )
+            )
+            setting = setting.scalar_one_or_none()
+            if setting:
+                setting.is_enabled = not setting.is_enabled
+            else:
+                # Если записи не было, создаём с выключенным состоянием (пользователь нажал "выключить")
+                setting = NotifySetting(user_id=user.id, notification_type='event_reminder', is_enabled=False)
+                session.add(setting)
+            await session.commit()
+            new_status = setting.is_enabled
+        await callback.message.edit_text(
+            "🔔 Настройки уведомлений",
+            reply_markup=notify_settings_keyboard(enabled=new_status)
+        )
+        await callback.answer(f"Уведомления {'включены' if new_status else 'выключены'}")
     elif action == "profile_menu":
         await show_profile(callback, user)
     await callback.answer()
