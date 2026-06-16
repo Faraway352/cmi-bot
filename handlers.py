@@ -643,15 +643,16 @@ async def start_feedback(message_or_callback, state: FSMContext = None):
         keyboard = feedback_event_keyboard(events)
     else:
         text = "У вас нет посещённых мероприятий. Можете оставить отзыв о центре в целом.\nНапишите ваш отзыв сейчас."
-        keyboard = cancel_feedback_keyboard()   # всегда показываем отмену
+        keyboard = cancel_feedback_keyboard()
 
     if isinstance(message_or_callback, types.Message):
         if keyboard:
             await message_or_callback.answer(text, reply_markup=keyboard)
         else:
             await message_or_callback.answer(text)
-            if state:
-                await state.set_state(FeedbackFlow.waiting_for_text)
+        # Если это отзыв о центре (нет мероприятий) — включаем режим ожидания текста
+        if state and not events:
+            await state.set_state(FeedbackFlow.waiting_for_text)
     else:
         if keyboard:
             await message_or_callback.message.edit_text(text, reply_markup=keyboard)
