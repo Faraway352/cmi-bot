@@ -488,7 +488,10 @@ async def feedbacks_list(request):
             <td class="p-2 text-center">{fb.created_at.strftime('%d.%m.%Y')}</td>
         </tr>"""
     content = f"""
-    <h1 class="text-2xl font-bold mb-4">Отзывы</h1>
+    <div class="flex justify-between mb-4">
+        <h1 class="text-2xl font-bold">Отзывы</h1>
+        <a href="/admin/feedbacks/export" class="bg-green-600 text-white px-4 py-2 rounded">📥 Скачать Excel</a>
+    </div>
     <table class="w-full bg-white shadow rounded">
         <thead class="bg-gray-200"><tr><th class="p-2 text-center">ID</th><th class="p-2 text-center">Пользователь</th><th class="p-2 text-center">Мероприятие</th><th class="p-2 text-center">Текст</th><th class="p-2 text-center">Дата</th></tr></thead>
         <tbody>{rows}</tbody>
@@ -499,6 +502,59 @@ async def feedbacks_list(request):
     </div>"""
     return web.Response(text=base_html("Отзывы", content), content_type='text/html')
 
+@require_admin
+async def feedbacks_export(request):
+    """Генерирует Excel-файл со всеми отзывами."""
+    async with async_session() as session:
+        feedbacks = (await session.execute(
+            select(Feedback).order_by(Feedback.created_at.desc())
+        )).scalars().all()
+
+        # Заранее получим всех пользователей и мероприятия, чтобы не делать запросы в цикле
+        user_ids = [fb.user_id for fb in feedbacks]
+        event_ids = [fb.events_id for fb in feedbacks if fb.events_id]
+
+        users_map = {}
+        if user_ids:
+            users = (await session.execute(
+                select(User).where(User.id.in_(user_ids))
+            )).scalars().all()
+            users_map = {u.id: u for u in users}
+
+        events_map = {}
+        if event_ids:
+            events = (await session.execute(
+                select(Event).where(Event.id.in_(event_ids))
+            )).scalars().all()
+            events_map = {e.id: e for e in events}
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Отзывы"
+    ws.append(["ID", "Пользователь", "Telegram ID", "Мероприятие", "Текст отзыва", "Дата"])
+
+    for fb in feedbacks:
+        user = users_map.get(fb.user_id)
+        event = events_map.get(fb.events_id) if fb.events_id else None
+        ws.append([
+            fb.id,
+            user.full_name if user else "Неизв.",
+            user.telegram_id if user else "",
+            event.title if event else "Центр",
+            fb.content,
+            str(fb.created_at) if fb.created_at else ""
+        ])
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    return web.Response(
+        body=output.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': 'attachment; filename=feedbacks.xlsx'}
+    )
+    
 # ---------- Рассылка ----------
 @require_admin
 async def broadcast_form(request):
