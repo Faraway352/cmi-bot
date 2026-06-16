@@ -17,7 +17,7 @@ from handlers import (
     my_registrations, my_registration_detail,
     start_feedback, feedback_chosen, save_feedback,
     cmd_seed, cmd_menu, echo, process_tg_username, skip_tg_username, process_vk, skip_vk,
-    process_email, skip_email, delete_account_execute,
+    process_email, skip_email, delete_account_execute, cancel_feedback
 )
 from web_admin import (
     login_page, login_send_code, verify_code, logout,
@@ -119,7 +119,8 @@ async def main():
 
     # Отзывы
     dp.callback_query.register(feedback_chosen, F.data.startswith("feedback_"))
-    dp.message.register(save_feedback, FeedbackFlow.waiting_for_text)
+    dp.callback_query.register(cancel_feedback, F.data == "cancel_feedback")
+    dp.message.register(, FeedbackFlow.waiting_for_text)
 
     # Команды
     dp.message.register(cmd_seed, Command("seed"))
