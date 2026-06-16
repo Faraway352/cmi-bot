@@ -240,6 +240,7 @@ async def events_list(request):
             <td class="p-2 text-center">{e.status}</td>
             <td class="p-2 text-center">
                 <a href="/admin/events/edit/{e.id}" class="text-blue-600 underline">Ред.</a> |
+                <a href="/admin/events/export/{e.id}" class="text-green-600 underline">Excel</a> |
                 <a href="/admin/events/delete/{e.id}" class="text-red-600 underline" onclick="return confirm('Удалить?')">Удл.</a>
             </td>
         </tr>"""
@@ -411,6 +412,59 @@ async def event_delete(request):
             await session.commit()
 
     return web.HTTPFound('/admin/events')
+
+@require_admin
+async def event_participants_export(request):
+    event_id = int(request.match_info['id'])
+    async with async_session() as session:
+        event = await session.get(Event, event_id)
+        if not event:
+            return web.Response(text="Мероприятие не найдено.", status=404)
+
+        registrations = (await session.execute(
+            select(Registration).where(
+                Registration.events_id == event_id,
+                Registration.status == 'registered'
+            )
+        )).scalars().all()
+
+        users = {}
+        if registrations:
+            user_ids = list(set(reg.user_id for reg in registrations))
+            users_db = (await session.execute(
+                select(User).where(User.id.in_(user_ids))
+            )).scalars().all()
+            for u in users_db:
+                users[u.id] = u
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = f"Участники_{event.title[:20]}"
+    ws.append(["ID", "Telegram ID", "ФИО", "Телефон", "Дата записи"])
+
+    for reg in registrations:
+        user = users.get(reg.user_id)
+        if user:
+            ws.append([
+                user.id,
+                user.telegram_id,
+                user.full_name,
+                user.phone,
+                str(reg.created_at) if reg.created_at else ""
+            ])
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    safe_title = "".join(c for c in event.title if c.isalnum() or c in (' ', '-', '_')).rstrip()[:50]
+    filename = f"participants_{safe_title}.xlsx"
+
+    return web.Response(
+        body=output.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+    )
 
 # ---------- Отзывы ----------
 @require_admin
