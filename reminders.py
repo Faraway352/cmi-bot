@@ -2,7 +2,7 @@ import asyncio
 from datetime import datetime, timedelta
 from sqlalchemy import select, update
 from config import async_session, BOT_TOKEN
-from models import Event, Registration, User
+from models import Event, Registration, User, NotifySetting
 from aiohttp import ClientSession
 
 async def send_reminders():
@@ -32,6 +32,17 @@ async def send_reminders():
             for reg in registrations:
                 user = await session.get(User, reg.user_id)
                 if user:
+                    # Проверяем настройки уведомлений
+                    notify_setting = await session.execute(
+                        select(NotifySetting).where(
+                            NotifySetting.user_id == user.id,
+                            NotifySetting.notification_type == 'event_reminder'
+                        )
+                    )
+                    notify_setting = notify_setting.scalar_one_or_none()
+                    if notify_setting and not notify_setting.is_enabled:
+                        continue  # пропускаем, если уведомления явно выключены
+                    # Если записи нет – считаем, что включены (старые пользователи)
                     text = (
                         f"⏰ Напоминание!\n\n"
                         f"Вы записаны на мероприятие «{event.title}»,\n"
