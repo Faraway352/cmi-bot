@@ -19,6 +19,8 @@ from validators import (
     is_valid_vk_url, is_valid_tg_username, is_valid_email,
     is_valid_phone
 )
+# 🛠 Исправлено: добавлен импорт InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardMarkup
 
 # ---------- Вспомогательные функции ----------
 async def get_user(telegram_id: int):
