@@ -4,6 +4,8 @@ from aiohttp import web, ClientSession
 from sqlalchemy import select, func
 from config import async_session, BOT_TOKEN
 from models import User, Event, Feedback, AdminAction
+from io import BytesIO
+from openpyxl import Workbook
 
 SESSIONS = {}
 PENDING_CODES = {}
@@ -486,6 +488,43 @@ async def broadcast_send(request):
     content = f"<p>Рассылка завершена. Отправлено {sent} из {len(users)}.</p><a href='/admin/dashboard'>Назад</a>"
     return web.Response(text=base_html("Результат рассылки", content), content_type='text/html')
 
+@require_admin
+async def users_export(request):
+    """Генерирует Excel-файл со списком пользователей."""
+    async with async_session() as session:
+        users = (await session.execute(select(User).order_by(User.id))).scalars().all()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Пользователи"
+
+    # Заголовки
+    ws.append(["ID", "Telegram ID", "ФИО", "Телефон", "Пол", "Дата рождения", "Роль", "Email", "VK", "Дата регистрации"])
+
+    for u in users:
+        ws.append([
+            u.id,
+            u.telegram_id,
+            u.full_name,
+            u.phone,
+            u.gender,
+            str(u.birthday) if u.birthday else "",
+            u.role,
+            u.email,
+            u.vk_url,
+            str(u.created_at) if u.created_at else ""
+        ])
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    return web.Response(
+        body=output.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': 'attachment; filename=users.xlsx'}
+    )
+    
 # ---------- Логи действий администраторов ----------
 @require_admin
 async def admin_actions_list(request):
