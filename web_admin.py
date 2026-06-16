@@ -206,7 +206,11 @@ async def users_list(request):
             <td class="p-2 text-center">{u.created_at.strftime('%d.%m.%Y') if u.created_at else ''}</td>
         </tr>"""
     content = f"""
-    <h1 class="text-2xl font-bold mb-4">Пользователи</h1>
+    <div class="flex justify-between mb-4">
+        <h1 class="text-2xl font-bold">Пользователи</h1>
+        <a href="/admin/users/export" class="bg-green-600 text-white px-4 py-2 rounded">📥 Скачать Excel
+    </a>
+    </div>
     <table class="w-full bg-white shadow rounded">
         <thead class="bg-gray-200"><tr><th class="p-2 text-center">ID</th><th class="p-2 text-center">ФИО</th><th class="p-2 text-center">Telegram ID</th><th class="p-2 text-center">Телефон</th><th class="p-2 text-center">Роль</th><th class="p-2 text-center">Дата рег.</th></tr></thead>
         <tbody>{rows}</tbody>
