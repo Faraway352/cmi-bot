@@ -766,6 +766,19 @@ async def cmd_menu(message: types.Message):
     else:
         await message.answer("Сначала /start")
 
+# ---------- Команда /cancel ----------
+async def cmd_cancel(message: types.Message, state: FSMContext):
+    current_state = await state.get_state()
+    if current_state is not None:
+        await state.clear()
+        user = await get_user(message.from_user.id)
+        if user:
+            await message.answer("🚫 Действие отменено.", reply_markup=main_menu_keyboard())
+        else:
+            await message.answer("🚫 Действие отменено. Введите /start для начала.")
+    else:
+        await message.answer("🤷 Нет активного действия для отмены.")
+
 # ---------- Эхо ----------
 async def echo(message: types.Message):
     await message.answer("Используйте /start или кнопки меню.")
