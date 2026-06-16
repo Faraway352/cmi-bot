@@ -741,23 +741,6 @@ async def delete_account_execute(callback: types.CallbackQuery, bot: Bot):
     )
     await callback.answer("Аккаунт удалён")
     
-# ---------- Команда /seed ----------
-async def cmd_seed(message: types.Message):
-    user = await get_user(message.from_user.id)
-    if not user or user.role != 'admin':
-        await message.answer("⛔ Недостаточно прав.")
-        return
-    test_events = [
-        {"title": "Квиз «Молодежь и наука»", "description": "Интеллектуальная игра.", "date_time": datetime(2026, 6, 15, 18, 0), "location": "ул. Ленина, 10", "participants_limit": 20, "is_paid": False},
-        {"title": "Мастер-класс по SMM", "description": "Практический семинар.", "date_time": datetime(2026, 7, 1, 15, 0), "location": "ЦМИ", "participants_limit": 15, "is_paid": True},
-        {"title": "Велопробег «Вперед!»", "description": "Спортивный заезд.", "date_time": datetime(2026, 8, 20, 10, 0), "location": "Старт от пл. Ленина", "participants_limit": 0, "is_paid": False}
-    ]
-    async with async_session() as session:
-        for ev in test_events:
-            session.add(Event(**ev))
-        await session.commit()
-    await message.answer("✅ Тестовые мероприятия созданы.")
-
 # ---------- /menu ----------
 async def cmd_menu(message: types.Message):
     user = await get_user(message.from_user.id)
