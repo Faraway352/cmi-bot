@@ -677,6 +677,18 @@ async def save_feedback(message: types.Message, state: FSMContext):
         feedback = Feedback(user_id=user.id, events_id=event_id, content=text)
         session.add(feedback)
         await session.commit()
+    async with async_session() as session:
+        admins = await session.execute(select(User).where(User.role == 'admin'))
+        admins = admins.scalars().all()
+
+    for admin in admins:
+        try:
+            await message.bot.send_message(
+                admin.telegram_id,
+                f"📝 Новый отзыв от {user.full_name} (ID {user.telegram_id}):\n{text}"
+            )
+        except Exception:
+            pass
     await message.answer("✅ Спасибо за ваш отзыв!", reply_markup=main_menu_keyboard())
     await state.clear()
 
