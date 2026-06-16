@@ -208,8 +208,7 @@ async def users_list(request):
     content = f"""
     <div class="flex justify-between mb-4">
         <h1 class="text-2xl font-bold">Пользователи</h1>
-        <a href="/admin/users/export" class="bg-green-600 text-white px-4 py-2 rounded">📥 Скачать Excel
-    </a>
+        <a href="/admin/users/export" class="bg-green-600 text-white px-4 py-2 rounded">📥 Скачать Excel</a>
     </div>
     <table class="w-full bg-white shadow rounded">
         <thead class="bg-gray-200"><tr><th class="p-2 text-center">ID</th><th class="p-2 text-center">ФИО</th><th class="p-2 text-center">Telegram ID</th><th class="p-2 text-center">Телефон</th><th class="p-2 text-center">Роль</th><th class="p-2 text-center">Дата рег.</th></tr></thead>
@@ -529,6 +528,40 @@ async def users_export(request):
         headers={'Content-Disposition': 'attachment; filename=users.xlsx'}
     )
     
+@require_admin
+async def users_export(request):
+    async with async_session() as session:
+        users = (await session.execute(select(User).order_by(User.id))).scalars().all()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Пользователи"
+    ws.append(["ID", "Telegram ID", "ФИО", "Телефон", "Пол", "Дата рождения", "Роль", "Email", "VK", "Дата регистрации"])
+
+    for u in users:
+        ws.append([
+            u.id,
+            u.telegram_id,
+            u.full_name,
+            u.phone,
+            u.gender,
+            str(u.birthday) if u.birthday else "",
+            u.role,
+            u.email,
+            u.vk_url,
+            str(u.created_at) if u.created_at else ""
+        ])
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    return web.Response(
+        body=output.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': 'attachment; filename=users.xlsx'}
+    )
+
 # ---------- Логи действий администраторов ----------
 @require_admin
 async def admin_actions_list(request):
