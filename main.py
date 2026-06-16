@@ -25,7 +25,7 @@ from web_admin import (
     event_edit_form, event_edit_post, event_delete,
     feedbacks_list, broadcast_form, broadcast_send,
     error_middleware, admin_actions_list, users_export,
-    admin_actions_list
+    admin_actions_list, event_participants_export
 )
 from reminders import reminder_loop          # <-- фоновая задача напоминаний
 
