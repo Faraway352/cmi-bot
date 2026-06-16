@@ -84,7 +84,7 @@ async def cancel_registration(event_id: int, user_id: int, bot: Bot):
 # ---------- /start ----------
 async def cmd_start(message: types.Message, state: FSMContext):
     await state.clear()
-    user = await get_user(message.from_user.id)
+    user = await get_user(message.chat.id)
     if user:
         await message.answer(
             f"С возвращением, {user.full_name}!\nЧто хотите сделать?",
@@ -215,7 +215,7 @@ async def process_email(message: types.Message, state: FSMContext):
     await finish_registration(message, state)
 
 async def skip_email(callback: types.CallbackQuery, state: FSMContext):
-    await finish_registration(callback.message, state, is_callback=True)
+    await finish_registration(callback.message, state)
     await callback.answer()
 
 async def finish_registration(message: types.Message, state: FSMContext, is_callback=False):
