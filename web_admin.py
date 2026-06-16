@@ -53,6 +53,7 @@ def base_html(title, content):
                 <li><a href="/admin/users" class="block p-2 hover:bg-indigo-100 rounded">👥 Пользователи</a></li>
                 <li><a href="/admin/events" class="block p-2 hover:bg-indigo-100 rounded">📋 Мероприятия</a></li>
                 <li><a href="/admin/feedbacks" class="block p-2 hover:bg-indigo-100 rounded">💬 Отзывы</a></li>
+                <li><a href="/admin/actions" class="block p-2 hover:bg-indigo-100 rounded">📋 Логи</a></li>
                 <li><a href="/admin/broadcast" class="block p-2 hover:bg-indigo-100 rounded">📢 Рассылка</a></li>
             </ul>
         </aside>
@@ -484,3 +485,53 @@ async def broadcast_send(request):
 
     content = f"<p>Рассылка завершена. Отправлено {sent} из {len(users)}.</p><a href='/admin/dashboard'>Назад</a>"
     return web.Response(text=base_html("Результат рассылки", content), content_type='text/html')
+
+# ---------- Логи действий администраторов ----------
+@require_admin
+async def admin_actions_list(request):
+    page = int(request.query.get('page', 1))
+    per_page = 15
+    offset = (page - 1) * per_page
+    async with async_session() as session:
+        total = await session.scalar(select(func.count(AdminAction.id)))
+        actions = (await session.execute(
+            select(AdminAction).order_by(AdminAction.created_at.desc()).offset(offset).limit(per_page)
+        )).scalars().all()
+
+    rows = ""
+    for a in actions:
+        admin_user = None
+        if a.admin_id:
+            async with async_session() as session:
+                admin_user = await session.get(User, a.admin_id)
+        admin_name = admin_user.full_name if admin_user else "Неизв."
+        payload_str = str(a.payload)[:100] if a.payload else ""
+        rows += f"""<tr class="border-b">
+            <td class="p-2 text-center">{a.id}</td>
+            <td class="p-2 text-center">{admin_name}</td>
+            <td class="p-2 text-center">{a.action}</td>
+            <td class="p-2 text-center">{a.object_id or ''}</td>
+            <td class="p-2 text-center">{payload_str}</td>
+            <td class="p-2 text-center">{a.ip_address or ''}</td>
+            <td class="p-2 text-center">{a.created_at.strftime('%d.%m.%Y %H:%M') if a.created_at else ''}</td>
+        </tr>"""
+
+    content = f"""
+    <h1 class="text-2xl font-bold mb-4">Логи действий администраторов</h1>
+    <table class="w-full bg-white shadow rounded">
+        <thead class="bg-gray-200"><tr>
+            <th class="p-2 text-center">ID</th>
+            <th class="p-2 text-center">Администратор</th>
+            <th class="p-2 text-center">Действие</th>
+            <th class="p-2 text-center">Объект</th>
+            <th class="p-2 text-center">Данные</th>
+            <th class="p-2 text-center">IP</th>
+            <th class="p-2 text-center">Время</th>
+        </tr></thead>
+        <tbody>{rows}</tbody>
+    </table>
+    <div class="mt-4 flex gap-2">
+        {f'<a href="/admin/actions?page={page-1}" class="px-3 py-1 bg-gray-200 rounded">Назад</a>' if page > 1 else ''}
+        {f'<a href="/admin/actions?page={page+1}" class="px-3 py-1 bg-gray-200 rounded">Вперёд</a>' if page * per_page < total else ''}
+    </div>"""
+    return web.Response(text=base_html("Логи", content), content_type='text/html')
