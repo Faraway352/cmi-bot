@@ -97,7 +97,7 @@ async def main():
     dp.callback_query.register(profile_menu_handler, F.data.in_([
         "edit_full_name", "edit_phone", "edit_gender", "edit_birthday",
         "edit_vk", "edit_tg_username", "edit_email",
-        "notify_settings", "toggle_notify", "profile_menu"
+        "notify_settings", "toggle_notify", "profile_menu", "delete_account"
     ]))
     dp.message.register(edit_full_name, ProfileEdit.waiting_for_full_name)
     dp.message.register(edit_phone, ProfileEdit.waiting_for_phone)
