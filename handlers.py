@@ -1,7 +1,7 @@
 from aiogram import Bot, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import CommandStart, StateFilter, Command
-from sqlalchemy import select, func, delete
+from sqlalchemy import select, func, delete, update
 from datetime import datetime, date
 
 from config import async_session
@@ -570,8 +570,16 @@ async def my_registrations(message_or_callback):
             .order_by(Registration.created_at.desc())
         )
         regs = regs.scalars().all()
-        for reg in regs:
-            await session.refresh(reg, ['event'])
+
+        # Загружаем все связанные события одним запросом
+        event_ids = [r.events_id for r in regs]
+        if event_ids:
+            events = (await session.execute(
+                select(Event).where(Event.id.in_(event_ids))
+            )).scalars().all()
+            event_map = {e.id: e for e in events}
+            for r in regs:
+                r.event = event_map.get(r.events_id)   # "прикрепляем" событие к регистрации
     if not regs:
         text = "У вас пока нет записей."
         if isinstance(message_or_callback, types.Message):
@@ -593,8 +601,10 @@ async def my_registration_detail(callback: types.CallbackQuery):
         if not reg:
             await callback.answer("Запись не найдена.")
             return
-        await session.refresh(reg, ['event'])
-        event = reg.event
+        event = await session.get(Event, reg.events_id)
+        if not event:
+            await callback.answer("Мероприятие не найдено.")
+            return
         can_cancel = reg.status in ('registered', 'waiting') and event.date_time > datetime.now()
     text = (
         f"**{event.title}**\n📅 {event.date_time.strftime('%d.%m.%Y в %H:%M')}\n"
