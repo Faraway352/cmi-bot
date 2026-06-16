@@ -17,7 +17,7 @@ from handlers import (
     my_registrations, my_registration_detail,
     start_feedback, feedback_chosen, save_feedback,
     cmd_seed, cmd_menu, echo, process_tg_username, skip_tg_username, process_vk, skip_vk,
-    process_email, skip_email,
+    process_email, skip_email, delete_account_execute,
 )
 from web_admin import (
     login_page, login_send_code, verify_code, logout,
@@ -105,6 +105,7 @@ async def main():
     dp.message.register(edit_vk, ProfileEdit.waiting_for_vk)
     dp.message.register(edit_tg_username, ProfileEdit.waiting_for_tg_username)
     dp.message.register(edit_email, ProfileEdit.waiting_for_email)
+    dp.callback_query.register(delete_account_execute, F.data == "delete_account_execute")
 
     # Афиша
     dp.callback_query.register(show_events, F.data == "show_events")
