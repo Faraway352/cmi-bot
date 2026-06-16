@@ -110,8 +110,8 @@ async def process_phone_contact(message: types.Message, state: FSMContext):
 
 async def process_phone_manually(message: types.Message, state: FSMContext):
     phone = message.text.strip()
-    if not phone.startswith("+") or not phone[1:].isdigit():
-        await message.answer("❌ Введите номер в формате +7XXXXXXXXXX или нажмите кнопку ниже.")
+    if not is_valid_phone(phone):
+        await message.answer("❌ Введите номер в формате +7XXXXXXXXXX (10 цифр после +7).")
         return
     await state.update_data(phone=phone)
     await message.answer("Теперь введите ваше ФИО (полностью).", reply_markup=remove_keyboard())
@@ -369,8 +369,8 @@ async def edit_full_name(message: types.Message, state: FSMContext):
 
 async def edit_phone(message: types.Message, state: FSMContext):
     phone = message.text.strip()
-    if not phone.startswith("+") or not phone[1:].isdigit():
-        await message.answer("❌ Введите номер в формате +7XXXXXXXXXX.")
+    if not is_valid_phone(phone):
+        await message.answer("❌ Введите номер в формате +7XXXXXXXXXX (10 цифр после +7).")
         return
     user = await get_user(message.from_user.id)
     async with async_session() as session:
