@@ -41,7 +41,9 @@ def is_valid_birthday(text: str) -> bool:
 def is_valid_vk_url(url: str) -> bool:
     if not url:
         return False
-    return bool(re.match(r"^(https?://)?vk\.com/[\w.]+$", url.strip()))
+    # Разрешённые домены: vk.com, vk.ru, vkontakte.ru с опциональными www, m, http/https
+    pattern = r"^(https?://)?(www\.)?(m\.)?(vk\.com|vk\.ru|vkontakte\.ru)/[\w.]+$"
+    return bool(re.match(pattern, url.strip()))
 
 def is_valid_tg_username(username: str) -> bool:
     if not username:
