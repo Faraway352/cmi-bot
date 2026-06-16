@@ -4,6 +4,11 @@ from aiogram.types import (
     ReplyKeyboardRemove
 )
 
+def cancel_feedback_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_feedback")]
+    ])
+    
 def phone_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text="📱 Предоставить номер", request_contact=True)]],
