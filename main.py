@@ -54,6 +54,7 @@ async def run_web_server():
     app.router.add_get("/admin/broadcast", broadcast_form)
     app.router.add_post("/admin/broadcast", broadcast_send)
     app.router.add_get("/admin/actions", admin_actions_list)
+    app.router.add_get("/admin/users/export", users_export)
 
     runner = web.AppRunner(app)
     await runner.setup()
