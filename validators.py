@@ -22,6 +22,11 @@ def contains_emoji(text: str) -> bool:
     )
     return bool(emoji_pattern.search(text))
 
+def is_valid_phone(phone: str) -> bool:
+    if not phone:
+        return False
+    return bool(re.match(r"^\+7\d{10}$", phone.strip()))
+
 def is_valid_birthday(text: str) -> bool:
     if contains_emoji(text):
         return False
