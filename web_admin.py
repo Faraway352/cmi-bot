@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from aiohttp import web, ClientSession
 from sqlalchemy import select, func
 from config import async_session, BOT_TOKEN
-from models import User, Event, Feedback
+from models import User, Event, Feedback, AdminAction
 
 SESSIONS = {}
 PENDING_CODES = {}
@@ -63,6 +63,7 @@ def base_html(title, content):
 </body>
 </html>"""
 
+# ---------- Вход / 2FA ----------
 async def login_page(request):
     if request.cookies.get('admin_token') and request.cookies['admin_token'] in SESSIONS:
         return web.HTTPFound('/admin/dashboard')
@@ -149,6 +150,13 @@ async def send_telegram_code(chat_id, code):
             if resp.status != 200:
                 text = await resp.text()
                 raise Exception(f"Telegram API error: {text}")
+
+# ---------- Вспомогательная функция ----------
+async def get_admin_db_id(telegram_id: int) -> int:
+    async with async_session() as session:
+        result = await session.execute(select(User.id).where(User.telegram_id == telegram_id))
+        user_id = result.scalar()
+        return user_id
 
 # ---------- Дашборд ----------
 @require_admin
@@ -269,14 +277,32 @@ async def event_create(request):
         dt = datetime.strptime(data['datetime'], "%Y-%m-%d %H:%M")
     except Exception:
         return web.Response(text="Неверный формат даты. <a href='/admin/events/create'>Назад</a>", content_type='text/html')
+
+    admin_tg_id = request.get('admin_tg_id')
+    admin_id = await get_admin_db_id(admin_tg_id)
+
     async with async_session() as session:
         event = Event(
-            title=data['title'], description=data.get('description'), date_time=dt,
-            location=data.get('location'), participants_limit=int(data.get('limit', 0)),
+            title=data['title'],
+            description=data.get('description'),
+            date_time=dt,
+            location=data.get('location'),
+            participants_limit=int(data.get('limit', 0)),
             is_paid=bool(data.get('is_paid'))
         )
         session.add(event)
+        await session.flush()
+
+        action = AdminAction(
+            admin_id=admin_id,
+            action='create_event',
+            object_id=event.id,
+            payload={'title': event.title, 'date_time': str(event.date_time)},
+            ip_address=request.remote
+        )
+        session.add(action)
         await session.commit()
+
     return web.HTTPFound('/admin/events')
 
 @require_admin
@@ -312,10 +338,24 @@ async def event_edit_form(request):
 async def event_edit_post(request):
     event_id = int(request.match_info['id'])
     data = await request.post()
+    admin_tg_id = request.get('admin_tg_id')
+    admin_id = await get_admin_db_id(admin_tg_id)
+
     async with async_session() as session:
         event = await session.get(Event, event_id)
         if not event:
             return web.Response(text="Не найдено.", status=404)
+
+        old_values = {
+            'title': event.title,
+            'description': event.description,
+            'date_time': str(event.date_time),
+            'location': event.location,
+            'participants_limit': event.participants_limit,
+            'status': event.status,
+            'is_paid': event.is_paid,
+        }
+
         event.title = data['title']
         event.description = data.get('description')
         event.date_time = datetime.strptime(data['datetime'], "%Y-%m-%d %H:%M")
@@ -323,17 +363,47 @@ async def event_edit_post(request):
         event.participants_limit = int(data.get('limit', 0))
         event.status = data['status']
         event.is_paid = bool(data.get('is_paid'))
+
+        action = AdminAction(
+            admin_id=admin_id,
+            action='edit_event',
+            object_id=event.id,
+            payload={'old': old_values, 'new': {
+                'title': event.title,
+                'description': event.description,
+                'date_time': str(event.date_time),
+                'location': event.location,
+                'participants_limit': event.participants_limit,
+                'status': event.status,
+                'is_paid': event.is_paid,
+            }},
+            ip_address=request.remote
+        )
+        session.add(action)
         await session.commit()
+
     return web.HTTPFound('/admin/events')
 
 @require_admin
 async def event_delete(request):
     event_id = int(request.match_info['id'])
+    admin_tg_id = request.get('admin_tg_id')
+    admin_id = await get_admin_db_id(admin_tg_id)
+
     async with async_session() as session:
         event = await session.get(Event, event_id)
         if event:
             event.is_archived = True
+            action = AdminAction(
+                admin_id=admin_id,
+                action='delete_event',
+                object_id=event.id,
+                payload={'title': event.title},
+                ip_address=request.remote
+            )
+            session.add(action)
             await session.commit()
+
     return web.HTTPFound('/admin/events')
 
 # ---------- Отзывы ----------
@@ -385,8 +455,12 @@ async def broadcast_form(request):
 async def broadcast_send(request):
     data = await request.post()
     text = data['message']
+    admin_tg_id = request.get('admin_tg_id')
+    admin_id = await get_admin_db_id(admin_tg_id)
+
     async with async_session() as session:
         users = (await session.execute(select(User.telegram_id))).scalars().all()
+
     sent = 0
     for uid in users:
         try:
@@ -396,5 +470,17 @@ async def broadcast_send(request):
                 sent += 1
         except Exception:
             pass
+
+    async with async_session() as session:
+        action = AdminAction(
+            admin_id=admin_id,
+            action='broadcast',
+            object_id=None,
+            payload={'message': text, 'sent': sent, 'total': len(users)},
+            ip_address=request.remote
+        )
+        session.add(action)
+        await session.commit()
+
     content = f"<p>Рассылка завершена. Отправлено {sent} из {len(users)}.</p><a href='/admin/dashboard'>Назад</a>"
     return web.Response(text=base_html("Результат рассылки", content), content_type='text/html')
