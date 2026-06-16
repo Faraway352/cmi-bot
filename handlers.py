@@ -716,14 +716,14 @@ async def delete_account_confirm(callback: types.CallbackQuery):
     )
     await callback.answer()
 
-async def delete_account_execute(callback: types.CallbackQuery, bot: Bot):
-    """Выполняет удаление аккаунта и всех связанных данных."""
+async def delete_account_execute(callback: types.CallbackQuery):
+    bot = callback.bot
     user = await get_user(callback.from_user.id)
     if not user:
         await callback.answer("Пользователь не найден.")
         return
 
-    # Отменяем все активные регистрации (чтобы освободить места и продвинуть очередь)
+    # Отменяем все активные регистрации (освобождаем места и продвигаем очередь)
     async with async_session() as session:
         active_regs = await session.execute(
             select(Registration).where(
@@ -740,8 +740,6 @@ async def delete_account_execute(callback: types.CallbackQuery, bot: Bot):
         await session.execute(delete(Registration).where(Registration.user_id == user.id))
         await session.execute(delete(Feedback).where(Feedback.user_id == user.id))
         await session.execute(delete(NotifySetting).where(NotifySetting.user_id == user.id))
-        # Если есть таблица auth_codes, тоже удаляем (на ваше усмотрение)
-        # await session.execute(delete(AuthCode).where(AuthCode.user_id == user.id))
         await session.execute(delete(User).where(User.id == user.id))
         await session.commit()
 
