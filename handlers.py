@@ -2,7 +2,7 @@ from aiogram import Bot, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import CommandStart, StateFilter, Command
 from sqlalchemy import select, func, delete, update
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 
 from config import async_session
 from models import User, Event, Registration, Feedback, NotifySetting
@@ -20,7 +20,7 @@ from validators import (
     is_valid_phone
 )
 # 🛠 Исправлено: добавлен импорт InlineKeyboardMarkup
-from aiogram.types import InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # ---------- Вспомогательные функции ----------
 async def get_user(telegram_id: int):
@@ -608,7 +608,7 @@ async def my_registration_detail(callback: types.CallbackQuery):
         if not event:
             await callback.answer("Мероприятие не найдено.")
             return
-        can_cancel = reg.status in ('registered', 'waiting') and event.date_time > datetime.now()
+        can_cancel = reg.status in ('registered', 'waiting') and event.date_time > datetime.now(tz=timezone.utc)
     text = (
         f"**{event.title}**\n📅 {event.date_time.strftime('%d.%m.%Y в %H:%M')}\n"
         f"📍 {event.location or 'Не указано'}\n"
