@@ -72,15 +72,19 @@ async def main():
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher()
 
-    # Регистрация
+    # 1. Базовые команды (самый высокий приоритет)
     dp.message.register(cmd_start, CommandStart())
+    dp.message.register(cmd_cancel, Command("cancel"))
+    dp.message.register(cmd_menu, Command("menu"))
+
+    # 2. Регистрация – шаг phone
     dp.message.register(process_phone_contact, RegState.waiting_for_phone, F.contact)
     dp.message.register(process_phone_manually, RegState.waiting_for_phone)
     dp.message.register(process_full_name, RegState.waiting_for_full_name)
     dp.callback_query.register(process_gender, RegState.waiting_for_gender, F.data.startswith('gender_'))
     dp.message.register(process_birthday, RegState.waiting_for_birthday)
 
-    # Добавленные шаги регистрации
+    # 3. Дополнительные шаги регистрации (tg_username, vk, email)
     dp.message.register(process_tg_username, RegState.waiting_for_tg_username)
     dp.callback_query.register(skip_tg_username, RegState.waiting_for_tg_username, F.data == "skip")
     dp.message.register(process_vk, RegState.waiting_for_vk)
@@ -88,12 +92,12 @@ async def main():
     dp.message.register(process_email, RegState.waiting_for_email)
     dp.callback_query.register(skip_email, RegState.waiting_for_email, F.data == "skip")
 
-    # Главное меню
+    # 4. Главное меню
     dp.message.register(main_menu_handler, F.text.in_([
         "👤 Личный кабинет", "📋 Мои записи", "🎉 Афиша", "💬 Оставить отзыв"
     ]))
 
-    # Профиль
+    # 5. Профиль и редактирование
     dp.callback_query.register(process_callback_main_menu, F.data == "main_menu")
     dp.callback_query.register(profile_menu_handler, F.data.in_([
         "edit_full_name", "edit_phone", "edit_gender", "edit_birthday",
@@ -107,39 +111,40 @@ async def main():
     dp.message.register(edit_vk, ProfileEdit.waiting_for_vk)
     dp.message.register(edit_tg_username, ProfileEdit.waiting_for_tg_username)
     dp.message.register(edit_email, ProfileEdit.waiting_for_email)
+
+    # Удаление аккаунта
     dp.callback_query.register(delete_account_execute, F.data == "delete_account_execute")
 
-    # Афиша
+    # 6. Афиша
     dp.callback_query.register(show_events, F.data == "show_events")
     dp.callback_query.register(event_detail, F.data.startswith("event_"))
     dp.callback_query.register(register_for_event, F.data.startswith("register_"))
     dp.callback_query.register(cancel_reg_handler, F.data.startswith("cancel_reg_"))
 
-    # Мои записи
+    # 7. Мои записи
     dp.callback_query.register(my_registrations, F.data == "my_registrations")
     dp.callback_query.register(my_registration_detail, F.data.startswith("myreg_"))
 
-    # Отзывы
+    # 8. Отзывы
     dp.callback_query.register(feedback_chosen, F.data.startswith("feedback_"))
     dp.callback_query.register(cancel_feedback, F.data == "cancel_feedback")
     dp.message.register(save_feedback, FeedbackFlow.waiting_for_text)
 
-    # Команды
-    dp.message.register(cmd_menu, Command("menu"))
-    dp.message.register(cmd_cancel, Command("cancel"))
+    # 9. Эхо – обработчик по умолчанию (должен быть последним)
     dp.message.register(echo, StateFilter(None))
 
-    # Создание таблиц БД (колонка reminder_sent уже добавлена ранее)
+    # Создание таблиц БД (если они ещё не созданы)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+    # Регистрируем команды в интерфейсе Telegram
     await bot.set_my_commands([
         BotCommand(command="start", description="Начать/перезапустить"),
         BotCommand(command="menu", description="Открыть главное меню"),
         BotCommand(command="cancel", description="Отменить текущее действие")
     ])
 
-    # Запускаем всё вместе: веб-сервер, поллинг бота и напоминания
+    # Запуск веб-сервера, поллинга бота и напоминаний
     await asyncio.gather(
         run_web_server(),
         dp.start_polling(bot),
