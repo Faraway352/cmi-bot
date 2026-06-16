@@ -46,6 +46,7 @@ async def run_web_server():
     app.router.add_get("/admin/dashboard", dashboard)
     app.router.add_get("/admin/users", users_list)
     app.router.add_get("/admin/events", events_list)
+    app.router.add_get("/admin/events/export/{id}", event_participants_export)
     app.router.add_get("/admin/events/create", event_create_form)
     app.router.add_post("/admin/events/create", event_create)
     app.router.add_get("/admin/events/edit/{id}", event_edit_form)
