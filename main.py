@@ -16,8 +16,9 @@ from handlers import (
     show_events, event_detail, register_for_event, cancel_reg_handler,
     my_registrations, my_registration_detail,
     start_feedback, feedback_chosen, save_feedback,
-    cmd_seed, cmd_menu, echo, process_tg_username, skip_tg_username, process_vk, skip_vk,
-    process_email, skip_email, delete_account_execute, cancel_feedback
+    cmd_menu, echo, process_tg_username, skip_tg_username, process_vk, skip_vk,
+    process_email, skip_email, delete_account_execute, cancel_feedback,
+    cmd_cancel
 )
 from web_admin import (
     login_page, login_send_code, verify_code, logout,
@@ -123,8 +124,8 @@ async def main():
     dp.message.register(save_feedback, FeedbackFlow.waiting_for_text)
 
     # Команды
-    dp.message.register(cmd_seed, Command("seed"))
     dp.message.register(cmd_menu, Command("menu"))
+    dp.message.register(cmd_cancel, Command("cancel"))
     dp.message.register(echo, StateFilter(None))
 
     # Создание таблиц БД (колонка reminder_sent уже добавлена ранее)
@@ -134,7 +135,7 @@ async def main():
     await bot.set_my_commands([
         BotCommand(command="start", description="Начать/перезапустить"),
         BotCommand(command="menu", description="Открыть главное меню"),
-        BotCommand(command="seed", description="(админ) Тестовые мероприятия"),
+        BotCommand(command="cancel", description="Отменить текущее действие")
     ])
 
     # Запускаем всё вместе: веб-сервер, поллинг бота и напоминания
