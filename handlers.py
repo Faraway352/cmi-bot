@@ -156,6 +156,7 @@ async def process_birthday(message: types.Message, state: FSMContext):
             role='user'
         )
         session.add(new_user)
+        await session.flush()   # <-- получить ID нового пользователя
         notify_setting = NotifySetting(
             user_id=new_user.id,
             notification_type='event_reminder',
