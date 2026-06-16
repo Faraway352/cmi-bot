@@ -120,7 +120,7 @@ async def main():
     # Отзывы
     dp.callback_query.register(feedback_chosen, F.data.startswith("feedback_"))
     dp.callback_query.register(cancel_feedback, F.data == "cancel_feedback")
-    dp.message.register(, FeedbackFlow.waiting_for_text)
+    dp.message.register(save_feedback, FeedbackFlow.waiting_for_text)
 
     # Команды
     dp.message.register(cmd_seed, Command("seed"))
