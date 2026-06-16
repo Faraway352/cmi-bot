@@ -484,8 +484,9 @@ async def show_events(message_or_callback):
     else:
         await message_or_callback.message.edit_text(text, reply_markup=keyboard, parse_mode="Markdown")
 
-async def event_detail(callback: types.CallbackQuery):
-    event_id = int(callback.data.split("_")[1])
+async def event_detail(callback: types.CallbackQuery, event_id: int = None):
+    if event_id is None:
+        event_id = int(callback.data.split("_")[1])
     async with async_session() as session:
         event = await session.get(Event, event_id)
     if not event:
@@ -559,7 +560,7 @@ async def cancel_reg_handler(callback: types.CallbackQuery, bot: Bot):
     success = await cancel_registration(event_id, user.id, bot)
     if success:
         await callback.answer("Запись отменена.")
-        await event_detail(callback)
+        await event_detail(callback, event_id=event_id)   # передаём event_id
     else:
         await callback.answer("Не удалось отменить запись.", show_alert=True)
 
