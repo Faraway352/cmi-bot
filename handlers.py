@@ -12,7 +12,7 @@ from keyboards import (
     main_menu_keyboard, profile_menu_keyboard, notify_settings_keyboard,
     events_list_keyboard, event_card_keyboard,
     my_registrations_keyboard, registration_card_keyboard,
-    feedback_event_keyboard, skip_keyboard
+    feedback_event_keyboard, skip_keyboard, cancel_feedback_keyboard
 )
 from validators import (
     is_valid_full_name, contains_emoji, is_valid_birthday,
@@ -628,7 +628,7 @@ async def start_feedback(message_or_callback, state: FSMContext = None):
         keyboard = feedback_event_keyboard(events)
     else:
         text = "У вас нет посещённых мероприятий. Можете оставить отзыв о центре в целом.\nНапишите ваш отзыв сейчас."
-        keyboard = None
+        keyboard = cancel_feedback_keyboard()   # всегда показываем отмену
 
     if isinstance(message_or_callback, types.Message):
         if keyboard:
@@ -642,7 +642,15 @@ async def start_feedback(message_or_callback, state: FSMContext = None):
             await message_or_callback.message.edit_text(text, reply_markup=keyboard)
         else:
             await message_or_callback.message.edit_text(text)
-            # Этот случай не используется, но если понадобится, нужно будет также установить state
+
+async def cancel_feedback(callback: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+    user = await get_user(callback.from_user.id)
+    if user:
+        await callback.message.answer("Главное меню:", reply_markup=main_menu_keyboard())
+    else:
+        await callback.message.answer("Сначала /start")
+    await callback.answer()
 
 async def feedback_chosen(callback: types.CallbackQuery, state: FSMContext):
     data = callback.data
