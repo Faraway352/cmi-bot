@@ -16,7 +16,8 @@ from keyboards import (
 )
 from validators import (
     is_valid_full_name, contains_emoji, is_valid_birthday,
-    is_valid_vk_url, is_valid_tg_username, is_valid_email
+    is_valid_vk_url, is_valid_tg_username, is_valid_email,
+    is_valid_phone
 )
 
 # ---------- Вспомогательные функции ----------
