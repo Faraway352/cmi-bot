@@ -634,10 +634,17 @@ async def start_feedback(message_or_callback, state: FSMContext = None):
         )
         regs = regs.scalars().all()
         events = []
-        for r in regs:
-            await session.refresh(r, ['event'])
-            if r.event not in events:
-                events.append(r.event)
+        # Загружаем все мероприятия одним запросом
+        event_ids = [r.events_id for r in regs]
+        if event_ids:
+            events_db = (await session.execute(
+                select(Event).where(Event.id.in_(event_ids))
+            )).scalars().all()
+            event_map = {e.id: e for e in events_db}
+            for r in regs:
+                ev = event_map.get(r.events_id)
+                if ev and ev not in events:
+                    events.append(ev)
 
     if events:
         text = "Выберите мероприятие, о котором хотите оставить отзыв:"
